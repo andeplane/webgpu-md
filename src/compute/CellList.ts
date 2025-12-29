@@ -205,30 +205,38 @@ export class CellList {
 
   /**
    * Pack parameters into a Float32Array for GPU upload
+   * Uses proper Uint32Array view for u32 fields to preserve bit patterns
    */
   private packParams(p: CellListParams): Float32Array {
-    return new Float32Array([
-      // First vec4: numAtoms, numCellsX, numCellsY, numCellsZ (as u32, but stored as f32 bits)
-      p.numAtoms,
-      p.numCellsX,
-      p.numCellsY,
-      p.numCellsZ,
-      // Second vec4: cellSizeX, cellSizeY, cellSizeZ, maxAtomsPerCell
-      p.cellSizeX,
-      p.cellSizeY,
-      p.cellSizeZ,
-      p.maxAtomsPerCell,
-      // Third vec4: originX, originY, originZ, boxLx
-      p.originX,
-      p.originY,
-      p.originZ,
-      p.boxLx,
-      // Fourth vec4: boxLy, boxLz, padding, padding
-      p.boxLy,
-      p.boxLz,
-      0,
-      0,
-    ])
+    const buffer = new ArrayBuffer(64)  // 16 floats = 64 bytes
+    const u32View = new Uint32Array(buffer)
+    const f32View = new Float32Array(buffer)
+
+    // First vec4: numAtoms, numCellsX, numCellsY, numCellsZ (u32)
+    u32View[0] = p.numAtoms
+    u32View[1] = p.numCellsX
+    u32View[2] = p.numCellsY
+    u32View[3] = p.numCellsZ
+
+    // Second vec4: cellSizeX, cellSizeY, cellSizeZ, maxAtomsPerCell (f32, f32, f32, u32)
+    f32View[4] = p.cellSizeX
+    f32View[5] = p.cellSizeY
+    f32View[6] = p.cellSizeZ
+    u32View[7] = p.maxAtomsPerCell
+
+    // Third vec4: originX, originY, originZ, boxLx (f32)
+    f32View[8] = p.originX
+    f32View[9] = p.originY
+    f32View[10] = p.originZ
+    f32View[11] = p.boxLx
+
+    // Fourth vec4: boxLy, boxLz, padding, padding (f32)
+    f32View[12] = p.boxLy
+    f32View[13] = p.boxLz
+    f32View[14] = 0
+    f32View[15] = 0
+
+    return new Float32Array(buffer)
   }
 
   /**

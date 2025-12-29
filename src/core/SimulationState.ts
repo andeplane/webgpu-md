@@ -33,7 +33,9 @@ export class SimulationState {
   // Staging buffers for CPU read-back
   positionsStagingBuffer: GPUBuffer
   velocitiesStagingBuffer: GPUBuffer
+  forcesStagingBuffer: GPUBuffer
   typesStagingBuffer: GPUBuffer
+  massesStagingBuffer: GPUBuffer
 
   // Simulation box
   box: SimulationBox
@@ -58,8 +60,9 @@ export class SimulationState {
     this._types = new Uint32Array(config.numAtoms)
     this._masses = new Float32Array(config.numAtoms)
 
-    // Default masses to 1.0
+    // Default masses to 1.0 and upload to GPU
     this._masses.fill(1.0)
+    // Note: We need to upload masses AFTER buffer creation, done below
 
     // Create GPU buffers
     this.positionsBuffer = this.createBuffer(
@@ -88,7 +91,7 @@ export class SimulationState {
 
     this.massesBuffer = this.createBuffer(
       this._masses.byteLength,
-      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       'masses'
     )
 
@@ -105,10 +108,22 @@ export class SimulationState {
       'velocities-staging'
     )
 
+    this.forcesStagingBuffer = this.createBuffer(
+      this._forces.byteLength,
+      GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      'forces-staging'
+    )
+
     this.typesStagingBuffer = this.createBuffer(
       this._types.byteLength,
       GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
       'types-staging'
+    )
+
+    this.massesStagingBuffer = this.createBuffer(
+      this._masses.byteLength,
+      GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      'masses-staging'
     )
 
     // Initialize simulation box
@@ -118,6 +133,9 @@ export class SimulationState {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       'box'
     )
+    
+    // Upload default masses (all 1.0) to GPU
+    this.writeBuffer(this.massesBuffer, this._masses)
   }
 
   private createBuffer(size: number, usage: GPUBufferUsageFlags, label: string): GPUBuffer {
@@ -240,32 +258,49 @@ export class SimulationState {
     return this._velocities
   }
 
-  /** 
-   * Compute kinetic energy: KE = 0.5 * sum(m_i * v_i^2)
-   * Note: Call readVelocities() first to ensure velocities are up to date
-   */
-  computeKineticEnergy(): number {
-    let ke = 0
-    for (let i = 0; i < this.numAtoms; i++) {
-      const vx = this._velocities[i * 3 + 0]
-      const vy = this._velocities[i * 3 + 1]
-      const vz = this._velocities[i * 3 + 2]
-      const v2 = vx * vx + vy * vy + vz * vz
-      ke += 0.5 * this._masses[i] * v2
-    }
-    return ke
+  /** Read forces back from GPU (async) */
+  async readForces(): Promise<Float32Array> {
+    await this.device.queue.onSubmittedWorkDone()
+    
+    const commandEncoder = this.device.createCommandEncoder()
+    commandEncoder.copyBufferToBuffer(
+      this.forcesBuffer,
+      0,
+      this.forcesStagingBuffer,
+      0,
+      this._forces.byteLength
+    )
+    this.device.queue.submit([commandEncoder.finish()])
+
+    await this.forcesStagingBuffer.mapAsync(GPUMapMode.READ)
+    const data = new Float32Array(this.forcesStagingBuffer.getMappedRange().slice(0))
+    this.forcesStagingBuffer.unmap()
+
+    this._forces.set(data)
+    return this._forces
   }
 
-  /**
-   * Compute instantaneous temperature: T = (2/3) * KE / (N * kB)
-   * In reduced units (kB = 1): T = (2/3) * KE / N
-   */
-  computeTemperature(): number {
-    const ke = this.computeKineticEnergy()
-    // In reduced units, kB = 1
-    // T = 2 * KE / (3 * N * kB) for 3D
-    return (2.0 / 3.0) * ke / this.numAtoms
+  async readMasses(): Promise<Float32Array> {
+    await this.device.queue.onSubmittedWorkDone()
+    
+    const commandEncoder = this.device.createCommandEncoder()
+    commandEncoder.copyBufferToBuffer(
+      this.massesBuffer,
+      0,
+      this.massesStagingBuffer,
+      0,
+      this._masses.byteLength
+    )
+    this.device.queue.submit([commandEncoder.finish()])
+
+    await this.massesStagingBuffer.mapAsync(GPUMapMode.READ)
+    const data = new Float32Array(this.massesStagingBuffer.getMappedRange().slice(0))
+    this.massesStagingBuffer.unmap()
+
+    this._masses.set(data)
+    return this._masses
   }
+
 
   /** Get CPU positions (may be stale, call readPositions() first) */
   get positions(): Float32Array {
@@ -463,6 +498,7 @@ export class SimulationState {
     this.massesBuffer.destroy()
     this.positionsStagingBuffer.destroy()
     this.typesStagingBuffer.destroy()
+    this.massesStagingBuffer.destroy()
     this.boxBuffer.destroy()
   }
 }

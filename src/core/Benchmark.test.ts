@@ -1,14 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { BenchmarkResult, BenchmarkConfig } from './Benchmark'
-
-// Mock simulation interface matching what runBenchmark expects
-interface MockSimulation {
-  numAtoms: number
-  step: () => void
-  ctx: {
-    waitForGPU: () => Promise<void>
-  }
-}
 
 // We test the calculation logic without GPU
 describe('Benchmark calculations', () => {

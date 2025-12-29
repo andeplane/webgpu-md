@@ -1,5 +1,6 @@
 import { WebGPUContext } from '../compute/WebGPUContext'
 import { NeighborList } from '../compute/NeighborList'
+import { KineticEnergy } from '../compute/KineticEnergy'
 import { SimulationBox } from './SimulationBox'
 import { SimulationState } from './SimulationState'
 import type { PairStyle } from '../pair-styles/PairStyle'
@@ -48,6 +49,7 @@ export class Simulation {
   readonly state: SimulationState
   readonly neighborList: NeighborList
   readonly integrator: Integrator
+  readonly kineticEnergy: KineticEnergy
   readonly pairStyle: PairStyle
 
   private currentStep = 0
@@ -60,6 +62,7 @@ export class Simulation {
     neighborList: NeighborList,
     integrator: Integrator,
     pairStyle: PairStyle,
+    kineticEnergy: KineticEnergy,
     neighEvery: number
   ) {
     this.ctx = ctx
@@ -67,6 +70,7 @@ export class Simulation {
     this.neighborList = neighborList
     this.integrator = integrator
     this.pairStyle = pairStyle
+    this.kineticEnergy = kineticEnergy
     this.neighRebuildEvery = neighEvery
   }
 
@@ -116,7 +120,10 @@ export class Simulation {
     })
     pairStyle.updateBox(state)
 
-    return new Simulation(ctx, state, neighborList, integrator, pairStyle, neighEvery)
+    // Create kinetic energy calculator
+    const kineticEnergyCalc = new KineticEnergy(ctx, config.numAtoms)
+
+    return new Simulation(ctx, state, neighborList, integrator, pairStyle, kineticEnergyCalc, neighEvery)
   }
 
   /**
@@ -183,7 +190,7 @@ export class Simulation {
     const epsilon = options.epsilon ?? 1.0
     const sigma = options.sigma ?? 1.0
     const dt = options.dt ?? 0.005
-    const cutoff = options.cutoff ?? 2.5 * sigma
+    let cutoff = options.cutoff ?? 2.5 * sigma
 
     // Calculate FCC lattice constant from density
     // For FCC: density = 4 * mass / a^3, so a = (4 / density)^(1/3)
@@ -194,6 +201,31 @@ export class Simulation {
     const lx = nx * latticeConstant
     const ly = ny * latticeConstant
     const lz = nz * latticeConstant
+    
+    // Check if cutoff is valid for this box size
+    // Minimum image convention requires cutoff <= box/2
+    const minBox = Math.min(lx, ly, lz)
+    const nnDistance = latticeConstant / Math.sqrt(2)  // FCC nearest neighbor distance
+    const minRequiredCells = Math.ceil(2 * cutoff / latticeConstant)
+    
+    if (cutoff > minBox / 2) {
+      console.warn(`⚠️ SYSTEM TOO SMALL for cutoff ${cutoff}!`)
+      console.warn(`  Box: ${minBox.toFixed(3)}, Box/2: ${(minBox/2).toFixed(3)}`)
+      console.warn(`  FCC nearest neighbor distance: ${nnDistance.toFixed(3)}`)
+      console.warn(`  Need at least ${minRequiredCells} unit cells for cutoff ${cutoff}`)
+      
+      // Check if any reasonable cutoff is possible
+      const maxSafeCutoff = minBox / 2 - 0.01
+      if (maxSafeCutoff < nnDistance) {
+        console.error(`❌ FATAL: Box too small! Max safe cutoff (${maxSafeCutoff.toFixed(3)}) < NN distance (${nnDistance.toFixed(3)})`)
+        console.error(`   Atoms won't interact! Use at least ${minRequiredCells} unit cells.`)
+        throw new Error(`System too small: need at least ${minRequiredCells} unit cells for LJ with cutoff ${cutoff}`)
+      }
+      
+      // Auto-adjust cutoff to be safe
+      console.warn(`Auto-adjusting cutoff to ${maxSafeCutoff.toFixed(3)}`)
+      cutoff = maxSafeCutoff
+    }
     
     const sim = await Simulation.create({
       numAtoms,
@@ -221,8 +253,8 @@ export class Simulation {
     sim.neighborList.build(sim.state.positionsBuffer)
     sim.lastNeighRebuild = 0
 
-    // Zero initial forces (they'll be computed on first step)
-    sim.state.zeroForces()
+    // Compute initial forces f(t=0) - needed for velocity Verlet first half-step
+    sim.pairStyle.compute(sim.state, sim.neighborList)
 
     return sim
   }
@@ -281,6 +313,33 @@ export class Simulation {
   }
 
   /**
+   * Read forces back from GPU for debugging
+   */
+  async readForces(): Promise<Float32Array> {
+    return this.state.readForces()
+  }
+
+  /**
+   * Read velocities back from GPU for debugging
+   */
+  async readVelocities(): Promise<Float32Array> {
+    return this.state.readVelocities()
+  }
+
+  /**
+   * Get neighbor list stats for debugging
+   */
+  getNeighborListStats() {
+    return {
+      maxNeighbors: this.neighborList.maxNeighbors,
+      numCells: this.neighborList.cellList.numCells,
+      numCellsX: this.neighborList.cellList.numCellsX,
+      numCellsY: this.neighborList.cellList.numCellsY,
+      numCellsZ: this.neighborList.cellList.numCellsZ,
+    }
+  }
+
+  /**
    * Force neighbor list rebuild on next step
    */
   forceNeighborRebuild(): void {
@@ -327,7 +386,7 @@ export class Simulation {
   }
 
   /**
-   * Compute total energy (kinetic + potential)
+   * Compute total energy (kinetic + potential) - ALL ON GPU
    * This requires GPU readback and is async
    */
   async computeEnergy(): Promise<{
@@ -336,12 +395,10 @@ export class Simulation {
     total: number
     temperature: number
   }> {
-    // Read velocities for kinetic energy
-    await this.state.readVelocities()
-    const kinetic = this.state.computeKineticEnergy()
-    const temperature = this.state.computeTemperature()
+    // Compute kinetic energy on GPU
+    const { kineticEnergy: kinetic, temperature } = await this.kineticEnergy.compute(this.state)
 
-    // Compute potential energy (forces are also computed as a side effect)
+    // Compute potential energy on GPU (forces are also computed as a side effect)
     const potential = await this.pairStyle.computeWithEnergy(this.state, this.neighborList)
 
     return {
@@ -354,11 +411,10 @@ export class Simulation {
 
   /**
    * Compute kinetic energy and temperature only (faster, no force recalculation)
+   * ALL ON GPU
    */
   async computeKineticEnergy(): Promise<{ kinetic: number; temperature: number }> {
-    await this.state.readVelocities()
-    const kinetic = this.state.computeKineticEnergy()
-    const temperature = this.state.computeTemperature()
+    const { kineticEnergy: kinetic, temperature } = await this.kineticEnergy.compute(this.state)
     return { kinetic, temperature }
   }
 
@@ -370,6 +426,7 @@ export class Simulation {
     this.neighborList.destroy()
     this.integrator.destroy()
     this.pairStyle.destroy()
+    this.kineticEnergy.destroy()
     this.ctx.destroy()
   }
 }

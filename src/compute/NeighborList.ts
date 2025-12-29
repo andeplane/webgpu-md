@@ -240,6 +240,34 @@ export class NeighborList {
   }
 
   /**
+   * Read neighbor counts back from GPU for debugging
+   */
+  async readNeighborCounts(): Promise<Uint32Array> {
+    const stagingBuffer = this.ctx.device.createBuffer({
+      size: this.numAtoms * 4,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+    
+    const commandEncoder = this.ctx.createCommandEncoder()
+    commandEncoder.copyBufferToBuffer(
+      this.numNeighborsBuffer,
+      0,
+      stagingBuffer,
+      0,
+      this.numAtoms * 4
+    )
+    this.ctx.submit([commandEncoder.finish()])
+    
+    await this.ctx.waitForGPU()
+    await stagingBuffer.mapAsync(GPUMapMode.READ)
+    const data = new Uint32Array(stagingBuffer.getMappedRange().slice(0))
+    stagingBuffer.unmap()
+    stagingBuffer.destroy()
+    
+    return data
+  }
+
+  /**
    * Destroy GPU resources
    */
   destroy(): void {

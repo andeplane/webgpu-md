@@ -134,6 +134,11 @@ export class SimulationVisualizer {
       this.particles.markNeedsUpdate()
       this.visualizer.forceRender = true
     }
+    
+    // Ensure point light is in scene (may have been removed by previous code)
+    if (this.visualizer.pointLight && !this.visualizer.scene.children.includes(this.visualizer.pointLight)) {
+      this.visualizer.scene.add(this.visualizer.pointLight)
+    }
   }
 
   /**

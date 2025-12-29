@@ -95,6 +95,14 @@ export abstract class PairStyle {
   ): ForceResult
 
   /**
+   * Compute forces and return potential energy (async for GPU readback)
+   */
+  abstract computeWithEnergy(
+    state: SimulationState,
+    neighborList: NeighborList
+  ): Promise<number>
+
+  /**
    * Get the bind group layout for this pair style's compute shader
    */
   abstract getBindGroupLayout(): GPUBindGroupLayout

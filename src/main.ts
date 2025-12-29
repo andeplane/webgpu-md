@@ -12,6 +12,8 @@ let benchmarkBtn: HTMLButtonElement | null = null
 let showBoxCheckbox: HTMLInputElement | null = null
 let stepsSlider: HTMLInputElement | null = null
 let stepsValue: HTMLElement | null = null
+let initTempInput: HTMLInputElement | null = null
+let unitCellsInput: HTMLInputElement | null = null
 
 // Energy tracking
 let initialEnergy: number | null = null
@@ -39,6 +41,18 @@ async function initializeApp() {
               <button id="play-btn" disabled>▶ Play</button>
               <button id="step-btn" disabled>Step</button>
               <button id="reset-btn">Reset</button>
+            </div>
+          </div>
+          
+          <div class="panel">
+            <h2>Initial Conditions</h2>
+            <div class="input-group">
+              <label for="init-temp">Temperature (T*):</label>
+              <input type="number" id="init-temp" value="0.01" min="0.001" max="5" step="0.01">
+            </div>
+            <div class="input-group">
+              <label for="unit-cells">Unit cells (n³):</label>
+              <input type="number" id="unit-cells" value="10" min="2" max="50" step="1">
             </div>
           </div>
           
@@ -115,6 +129,8 @@ async function initializeApp() {
   showBoxCheckbox = document.getElementById('show-box') as HTMLInputElement
   stepsSlider = document.getElementById('steps-slider') as HTMLInputElement
   stepsValue = document.getElementById('steps-value')
+  initTempInput = document.getElementById('init-temp') as HTMLInputElement
+  unitCellsInput = document.getElementById('unit-cells') as HTMLInputElement
 
   // Set up event listeners
   playBtn?.addEventListener('click', togglePlay)
@@ -150,11 +166,18 @@ async function resetSimulation() {
   lastEnergyUpdate = 0
 
   try {
+    // Get values from UI inputs
+    const initTemp = parseFloat(initTempInput?.value ?? '0.01')
+    const unitCells = parseInt(unitCellsInput?.value ?? '10')
+    
     // Create a simple LJ liquid using FCC lattice
-    // 30x30x30 FCC unit cells = 4*27000 = 108,000 atoms
-    simulation = await Simulation.createLJLiquid(30, 30, 30, {
+    // n³ FCC unit cells = 4*n³ atoms
+    const numAtoms = 4 * unitCells * unitCells * unitCells
+    updateStatus(`Creating LJ liquid (${numAtoms} atoms)...`)
+    
+    simulation = await Simulation.createLJLiquid(unitCells, unitCells, unitCells, {
       density: 0.8,
-      temperature: 1.0,
+      temperature: initTemp,
       epsilon: 1.0,
       sigma: 1.0,
       dt: 0.005,
@@ -215,23 +238,27 @@ function togglePlay() {
 async function singleStep() {
   updateStatus('Stepping...')
   
-  if (!visualizer) {
-    showError('No visualizer')
+  if (!visualizer || !simulation) {
+    showError('No visualizer or simulation')
     return
   }
   
   try {
-    await visualizer.stepAndRender()
+    await simulation.step()
+    
+    // Update visualization
+    await visualizer.update()
+    visualizer.render()
     
     const stepEl = document.getElementById('info-step')
-    if (stepEl && simulation) {
+    if (stepEl) {
       stepEl.textContent = simulation.timestep.toString()
     }
     
     // Update energy display
     await updateEnergy()
     
-    updateStatus(`Step ${simulation?.timestep} complete`)
+    updateStatus(`Step ${simulation.timestep} complete`)
   } catch (error) {
     console.error('Error during step:', error)
     showError(`Simulation error: ${error}`)

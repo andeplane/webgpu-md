@@ -1,5 +1,7 @@
 import { Visualizer, Particles } from 'omovi'
+import * as THREE from 'three'
 import type { Simulation } from './Simulation'
+import { createBoxGeometry, disposeBoxGeometry } from '../utils/boxGeometry'
 
 // Re-export omovi types for convenience
 export { Visualizer, Particles } from 'omovi'
@@ -23,10 +25,12 @@ export class SimulationVisualizer {
   readonly simulation: Simulation
   readonly visualizer: Visualizer
   private particles: InstanceType<typeof Particles> | null = null
+  private boxGroup: THREE.Group | null = null
   private animationFrameId: number | null = null
   private isRunning = false
   private stepsPerFrame = 10
   private onStep?: (step: number) => void
+  private showBox = true
 
   constructor(simulation: Simulation, container: HTMLElement) {
     this.simulation = simulation
@@ -66,8 +70,47 @@ export class SimulationVisualizer {
     // Set up atom type radii
     this.setupAtomTypes()
 
+    // Add simulation box wireframe
+    this.updateBoxGeometry()
+
     // Position camera to view system
     this.focusCamera()
+  }
+
+  /**
+   * Create or update the simulation box wireframe
+   */
+  private updateBoxGeometry(): void {
+    // Remove existing box
+    if (this.boxGroup) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(this.visualizer.scene as any).remove(this.boxGroup)
+      disposeBoxGeometry(this.boxGroup)
+      this.boxGroup = null
+    }
+
+    // Create new box if enabled
+    if (this.showBox) {
+      this.boxGroup = createBoxGeometry(this.simulation.box)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(this.visualizer.scene as any).add(this.boxGroup)
+    }
+  }
+
+  /**
+   * Show or hide the simulation box
+   */
+  setShowBox(show: boolean): void {
+    this.showBox = show
+    this.updateBoxGeometry()
+    this.visualizer.forceRender = true
+  }
+
+  /**
+   * Get whether box is shown
+   */
+  getShowBox(): boolean {
+    return this.showBox
   }
 
   /**
@@ -201,6 +244,15 @@ export class SimulationVisualizer {
    */
   destroy(): void {
     this.stop()
+    
+    // Clean up box geometry
+    if (this.boxGroup) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(this.visualizer.scene as any).remove(this.boxGroup)
+      disposeBoxGeometry(this.boxGroup)
+      this.boxGroup = null
+    }
+    
     this.visualizer.dispose()
   }
 }

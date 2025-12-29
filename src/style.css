@@ -218,6 +218,74 @@ input[type="range"]::-webkit-slider-thumb:hover {
   text-align: right;
 }
 
+/* Checkbox */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+/* Benchmark */
+.benchmark-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent-secondary), #5a1d8f);
+  border-color: var(--accent-secondary);
+}
+
+.benchmark-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #9b3dd5, var(--accent-secondary));
+  box-shadow: 0 0 20px rgba(123, 44, 191, 0.4);
+}
+
+.benchmark-result {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.bench-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.bench-stat:last-child {
+  border-bottom: none;
+}
+
+.bench-label {
+  color: var(--text-secondary);
+}
+
+.bench-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bench-stat.highlight {
+  background: rgba(0, 212, 255, 0.1);
+  margin: 0 -0.5rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-bottom: none;
+}
+
+.bench-stat.highlight .bench-value {
+  color: var(--accent-primary);
+  font-size: 1.1em;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .main-content {

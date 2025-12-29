@@ -1,5 +1,5 @@
 import './style.css'
-import { Simulation, SimulationVisualizer } from './core'
+import { Simulation, SimulationVisualizer, runBenchmark } from './core'
 
 // UI elements
 let simulation: Simulation | null = null
@@ -8,6 +8,8 @@ let statusEl: HTMLElement | null = null
 let playBtn: HTMLButtonElement | null = null
 let stepBtn: HTMLButtonElement | null = null
 let resetBtn: HTMLButtonElement | null = null
+let benchmarkBtn: HTMLButtonElement | null = null
+let showBoxCheckbox: HTMLInputElement | null = null
 let stepsSlider: HTMLInputElement | null = null
 let stepsValue: HTMLElement | null = null
 
@@ -45,6 +47,20 @@ async function initializeApp() {
           </div>
           
           <div class="panel">
+            <h2>Display</h2>
+            <label class="checkbox-label">
+              <input type="checkbox" id="show-box" checked>
+              Show simulation box
+            </label>
+          </div>
+          
+          <div class="panel">
+            <h2>Benchmark</h2>
+            <button id="benchmark-btn" class="benchmark-btn">Run Benchmark</button>
+            <div id="benchmark-result" class="benchmark-result"></div>
+          </div>
+          
+          <div class="panel">
             <h2>Status</h2>
             <div id="status" class="status">
               Initializing WebGPU...
@@ -72,6 +88,8 @@ async function initializeApp() {
   playBtn = document.getElementById('play-btn') as HTMLButtonElement
   stepBtn = document.getElementById('step-btn') as HTMLButtonElement
   resetBtn = document.getElementById('reset-btn') as HTMLButtonElement
+  benchmarkBtn = document.getElementById('benchmark-btn') as HTMLButtonElement
+  showBoxCheckbox = document.getElementById('show-box') as HTMLInputElement
   stepsSlider = document.getElementById('steps-slider') as HTMLInputElement
   stepsValue = document.getElementById('steps-value')
 
@@ -79,6 +97,8 @@ async function initializeApp() {
   playBtn?.addEventListener('click', togglePlay)
   stepBtn?.addEventListener('click', singleStep)
   resetBtn?.addEventListener('click', resetSimulation)
+  benchmarkBtn?.addEventListener('click', runBenchmarkMode)
+  showBoxCheckbox?.addEventListener('change', toggleShowBox)
   stepsSlider?.addEventListener('input', updateStepsPerFrame)
 
   // Check WebGPU support
@@ -165,12 +185,98 @@ async function singleStep() {
   }
 }
 
+function toggleShowBox() {
+  if (!visualizer || !showBoxCheckbox) return
+  visualizer.setShowBox(showBoxCheckbox.checked)
+}
+
 function updateStepsPerFrame() {
   if (!stepsSlider || !stepsValue || !visualizer) return
   
   const value = parseInt(stepsSlider.value)
   stepsValue.textContent = value.toString()
   visualizer.setStepsPerFrame(value)
+}
+
+async function runBenchmarkMode() {
+  if (!benchmarkBtn) return
+  
+  // Stop visualization if running
+  if (visualizer?.running) {
+    visualizer.stop()
+    if (playBtn) playBtn.textContent = '▶ Play'
+    if (stepBtn) stepBtn.disabled = false
+  }
+
+  // Disable controls during benchmark
+  benchmarkBtn.disabled = true
+  if (playBtn) playBtn.disabled = true
+  if (stepBtn) stepBtn.disabled = true
+  if (resetBtn) resetBtn.disabled = true
+
+  const resultEl = document.getElementById('benchmark-result')
+  if (resultEl) resultEl.innerHTML = 'Running benchmark...'
+  updateStatus('Running benchmark (no visualization)...')
+
+  try {
+    // Create a fresh simulation for benchmark (larger system)
+    // 10x10x10 = 1000 atoms
+    const benchSim = await Simulation.createLJLiquid(10, 10, 10, {
+      density: 0.8,
+      temperature: 1.0,
+      epsilon: 1.0,
+      sigma: 1.0,
+      dt: 0.005,
+      cutoff: 2.5,
+    })
+
+    const result = await runBenchmark(benchSim, {
+      warmupSteps: 100,
+      benchmarkSteps: 1000,
+      onProgress: (step, total) => {
+        if (resultEl) {
+          resultEl.innerHTML = `Progress: ${step}/${total}`
+        }
+      }
+    })
+
+    // Display results
+    if (resultEl) {
+      resultEl.innerHTML = `
+        <div class="bench-stat">
+          <span class="bench-label">Atoms:</span>
+          <span class="bench-value">${result.numAtoms}</span>
+        </div>
+        <div class="bench-stat">
+          <span class="bench-label">Steps/sec:</span>
+          <span class="bench-value">${result.stepsPerSecond.toFixed(1)}</span>
+        </div>
+        <div class="bench-stat highlight">
+          <span class="bench-label">M atom-steps/sec:</span>
+          <span class="bench-value">${result.millionAtomStepsPerSecond.toFixed(2)}</span>
+        </div>
+        <div class="bench-stat">
+          <span class="bench-label">ns/atom-step:</span>
+          <span class="bench-value">${result.nsPerAtomStep.toFixed(2)}</span>
+        </div>
+      `
+    }
+
+    updateStatus('Benchmark complete!')
+
+    // Clean up benchmark simulation
+    benchSim.destroy()
+
+  } catch (error) {
+    if (resultEl) resultEl.innerHTML = `Error: ${error}`
+    updateStatus('Benchmark failed')
+  }
+
+  // Re-enable controls
+  benchmarkBtn.disabled = false
+  if (playBtn) playBtn.disabled = false
+  if (stepBtn) stepBtn.disabled = false
+  if (resetBtn) resetBtn.disabled = false
 }
 
 function updateInfo() {

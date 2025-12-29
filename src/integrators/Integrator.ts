@@ -47,6 +47,11 @@ export abstract class Integrator {
   protected abstract updateParams(): void
 
   /**
+   * Update for new simulation box
+   */
+  abstract updateBox(state: SimulationState): void
+
+  /**
    * Initial integration phase (before force computation)
    * Typically: v += 0.5*dt*f/m, x += dt*v
    */

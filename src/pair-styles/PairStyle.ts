@@ -75,6 +75,11 @@ export abstract class PairStyle {
   abstract initCoeffs(coeffs: PairCoeff[]): void
 
   /**
+   * Update for new simulation box
+   */
+  abstract updateBox(state: SimulationState): void
+
+  /**
    * Compute forces using the neighbor list
    * Forces are accumulated into state.forcesBuffer
    * 

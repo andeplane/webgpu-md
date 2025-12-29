@@ -123,9 +123,9 @@ async function resetSimulation() {
   }
 
   try {
-    // Create a simple LJ liquid
-    // 8x8x8 = 512 atoms
-    simulation = await Simulation.createLJLiquid(8, 8, 8, {
+    // Create a simple LJ liquid using FCC lattice
+    // 5x5x5 FCC unit cells = 4*125 = 500 atoms
+    simulation = await Simulation.createLJLiquid(5, 5, 5, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,
@@ -176,12 +176,24 @@ function togglePlay() {
 }
 
 async function singleStep() {
-  if (!visualizer) return
-  await visualizer.stepAndRender()
+  updateStatus('Stepping...')
   
-  const stepEl = document.getElementById('info-step')
-  if (stepEl && simulation) {
-    stepEl.textContent = simulation.timestep.toString()
+  if (!visualizer) {
+    showError('No visualizer')
+    return
+  }
+  
+  try {
+    await visualizer.stepAndRender()
+    
+    const stepEl = document.getElementById('info-step')
+    if (stepEl && simulation) {
+      stepEl.textContent = simulation.timestep.toString()
+    }
+    updateStatus(`Step ${simulation?.timestep} complete`)
+  } catch (error) {
+    console.error('Error during step:', error)
+    showError(`Simulation error: ${error}`)
   }
 }
 
@@ -220,8 +232,8 @@ async function runBenchmarkMode() {
 
   try {
     // Create a fresh simulation for benchmark (larger system)
-    // 10x10x10 = 1000 atoms
-    const benchSim = await Simulation.createLJLiquid(10, 10, 10, {
+    // 6x6x6 FCC unit cells = 4*216 = 864 atoms
+    const benchSim = await Simulation.createLJLiquid(6, 6, 6, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,

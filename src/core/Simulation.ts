@@ -154,7 +154,14 @@ export class Simulation {
   }
 
   /**
-   * Create a simple LJ liquid system
+   * Create a simple LJ liquid system using FCC lattice
+   * 
+   * @param nx - number of FCC unit cells in x direction
+   * @param ny - number of FCC unit cells in y direction
+   * @param nz - number of FCC unit cells in z direction
+   * @param options - simulation options
+   * 
+   * Note: Total atoms = 4 * nx * ny * nz (FCC has 4 atoms per unit cell)
    */
   static async createLJLiquid(
     nx: number,
@@ -169,7 +176,8 @@ export class Simulation {
       cutoff?: number
     } = {}
   ): Promise<Simulation> {
-    const numAtoms = nx * ny * nz
+    // FCC has 4 atoms per unit cell
+    const numAtoms = 4 * nx * ny * nz
     const density = options.density ?? 0.8
     const temperature = options.temperature ?? 1.0
     const epsilon = options.epsilon ?? 1.0
@@ -177,32 +185,44 @@ export class Simulation {
     const dt = options.dt ?? 0.005
     const cutoff = options.cutoff ?? 2.5 * sigma
 
-    // Calculate box size from density
-    const volume = numAtoms / density
-    const length = Math.pow(volume, 1/3)
+    // Calculate FCC lattice constant from density
+    // For FCC: density = 4 * mass / a^3, so a = (4 / density)^(1/3)
+    // In reduced units with mass = 1:
+    const latticeConstant = Math.pow(4.0 / density, 1.0 / 3.0)
+    
+    // Box size
+    const lx = nx * latticeConstant
+    const ly = ny * latticeConstant
+    const lz = nz * latticeConstant
     
     const sim = await Simulation.create({
       numAtoms,
       numTypes: 1,
-      box: SimulationBox.fromDimensions(length, length, length),
+      box: SimulationBox.fromDimensions(lx, ly, lz),
       dt,
       cutoff,
     })
 
-    // Initialize lattice
-    const spacing = length / Math.max(nx, ny, nz)
-    sim.state.initializeLattice(nx, ny, nz, spacing, 0)
+    // Initialize FCC lattice
+    sim.state.initializeFCC(nx, ny, nz, latticeConstant, 0)
 
     // Set LJ coefficients
     sim.pairStyle.setCoeff(0, 0, epsilon, sigma)
 
-    // Initialize velocities
+    // Initialize velocities with Maxwell-Boltzmann distribution
     sim.state.initializeVelocities(temperature)
 
     // Update components for the new box
     sim.neighborList.updateBox(sim.state.box)
     sim.integrator.updateBox(sim.state)
     sim.pairStyle.updateBox(sim.state)
+
+    // Build initial neighbor list
+    sim.neighborList.build(sim.state.positionsBuffer)
+    sim.lastNeighRebuild = 0
+
+    // Zero initial forces (they'll be computed on first step)
+    sim.state.zeroForces()
 
     return sim
   }
@@ -237,27 +257,24 @@ export class Simulation {
   }
 
   /**
-   * Run a single timestep
+   * Run a single timestep using velocity Verlet integration
    */
   step(): void {
-    // Rebuild neighbor list if needed
+    // Velocity Verlet integration:
+    // 1. v(t+dt/2) = v(t) + 0.5 * dt * f(t) / m
+    // 2. x(t+dt) = x(t) + dt * v(t+dt/2)
+    this.integrator.integrateInitial(this.state)
+
+    // 3. Rebuild neighbor list if needed (after position update)
     if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
       this.neighborList.build(this.state.positionsBuffer)
       this.lastNeighRebuild = this.currentStep
     }
 
-    // Velocity Verlet integration:
-    // 1. v += 0.5 * dt * f / m
-    // 2. x += dt * v
-    this.integrator.integrateInitial(this.state)
-
-    // 3. Rebuild neighbor list (if using small skin, could rebuild every step)
-    this.neighborList.build(this.state.positionsBuffer)
-
-    // 4. Compute forces
+    // 4. Compute forces f(t+dt)
     this.pairStyle.compute(this.state, this.neighborList)
 
-    // 5. v += 0.5 * dt * f / m
+    // 5. v(t+dt) = v(t+dt/2) + 0.5 * dt * f(t+dt) / m
     this.integrator.integrateFinal(this.state)
 
     this.currentStep++

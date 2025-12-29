@@ -170,6 +170,9 @@ export class SimulationState {
 
   /** Read positions back from GPU (async) */
   async readPositions(): Promise<Float32Array> {
+    // Wait for any pending GPU work to complete
+    await this.device.queue.onSubmittedWorkDone()
+    
     const commandEncoder = this.device.createCommandEncoder()
     commandEncoder.copyBufferToBuffer(
       this.positionsBuffer,
@@ -240,7 +243,7 @@ export class SimulationState {
     ny: number,
     nz: number,
     spacing: number,
-    type = 1
+    type = 0
   ): void {
     const expectedAtoms = nx * ny * nz
     if (expectedAtoms !== this.numAtoms) {
@@ -268,6 +271,68 @@ export class SimulationState {
     const lx = nx * spacing
     const ly = ny * spacing
     const lz = nz * spacing
+    this.box = SimulationBox.fromDimensions(lx, ly, lz)
+
+    // Upload to GPU
+    this.writeBuffer(this.positionsBuffer, this._positions)
+    this.writeBuffer(this.typesBuffer, this._types)
+    this.writeBuffer(this.boxBuffer, this.box.toGPUData())
+  }
+
+  /**
+   * Initialize atoms on an FCC lattice
+   * FCC has 4 atoms per unit cell at positions:
+   * (0,0,0), (0.5,0.5,0), (0.5,0,0.5), (0,0.5,0.5)
+   * 
+   * @param nx - number of unit cells in x
+   * @param ny - number of unit cells in y  
+   * @param nz - number of unit cells in z
+   * @param latticeConstant - FCC lattice constant (unit cell size)
+   * @param type - atom type (default 0)
+   */
+  initializeFCC(
+    nx: number,
+    ny: number,
+    nz: number,
+    latticeConstant: number,
+    type = 0
+  ): void {
+    const expectedAtoms = 4 * nx * ny * nz
+    if (expectedAtoms !== this.numAtoms) {
+      throw new Error(`FCC lattice ${nx}x${ny}x${nz} has ${expectedAtoms} atoms, but numAtoms is ${this.numAtoms}`)
+    }
+
+    // FCC basis vectors (in units of lattice constant)
+    const basis = [
+      [0.0, 0.0, 0.0],
+      [0.5, 0.5, 0.0],
+      [0.5, 0.0, 0.5],
+      [0.0, 0.5, 0.5],
+    ]
+
+    let idx = 0
+    for (let iz = 0; iz < nz; iz++) {
+      for (let iy = 0; iy < ny; iy++) {
+        for (let ix = 0; ix < nx; ix++) {
+          for (const [bx, by, bz] of basis) {
+            const x = (ix + bx) * latticeConstant
+            const y = (iy + by) * latticeConstant
+            const z = (iz + bz) * latticeConstant
+
+            this._positions[idx * 3 + 0] = x
+            this._positions[idx * 3 + 1] = y
+            this._positions[idx * 3 + 2] = z
+            this._types[idx] = type
+            idx++
+          }
+        }
+      }
+    }
+
+    // Update box to fit lattice
+    const lx = nx * latticeConstant
+    const ly = ny * latticeConstant
+    const lz = nz * latticeConstant
     this.box = SimulationBox.fromDimensions(lx, ly, lz)
 
     // Upload to GPU

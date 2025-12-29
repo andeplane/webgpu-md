@@ -101,6 +101,9 @@ export async function runBenchmark(
 
 /**
  * Run a series of benchmarks with increasing system sizes
+ * 
+ * @param sizes - Array of FCC unit cell counts per dimension (e.g., [4, 5, 6])
+ *                Each n gives 4*n^3 atoms (FCC has 4 atoms per unit cell)
  */
 export async function runScalingBenchmark(
   sizes: number[],
@@ -113,14 +116,11 @@ export async function runScalingBenchmark(
   const results: BenchmarkResult[] = []
 
   for (const n of sizes) {
-    // Create cubic system with n^3 atoms
+    // Create cubic FCC system with n^3 unit cells = 4*n^3 atoms
     const simulation = await Simulation.createLJLiquid(n, n, n, {
       density: config.density ?? 0.8,
       temperature: config.temperature ?? 1.0,
     })
-
-    // Set LJ coefficients
-    simulation.setCoeff(0, 0, 1.0, 1.0)
 
     // Run benchmark
     const result = await runBenchmark(simulation, config)

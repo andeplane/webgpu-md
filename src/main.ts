@@ -300,8 +300,8 @@ async function runBenchmarkMode() {
 
   try {
     // Create a fresh simulation for benchmark
-    // 80x80x80 FCC unit cells = 4*512000 = 2,048,000 atoms
-    const benchSim = await Simulation.createLJLiquid(80, 80, 80, {
+    // 171x171x171 FCC unit cells = 4*5000211 = 20,000,844 atoms
+    const benchSim = await Simulation.createLJLiquid(171, 171, 171, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,

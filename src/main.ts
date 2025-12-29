@@ -299,9 +299,9 @@ async function runBenchmarkMode() {
   updateStatus('Running benchmark (no visualization)...')
 
   try {
-    // Create a fresh simulation for benchmark (same system size)
-    // 30x30x30 FCC unit cells = 4*27000 = 108,000 atoms
-    const benchSim = await Simulation.createLJLiquid(30, 30, 30, {
+    // Create a fresh simulation for benchmark
+    // 80x80x80 FCC unit cells = 4*512000 = 2,048,000 atoms
+    const benchSim = await Simulation.createLJLiquid(80, 80, 80, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,

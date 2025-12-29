@@ -5,3 +5,5 @@ export type { GPUBufferConfig } from './SimulationState'
 export { Simulation } from './Simulation'
 export type { SimulationConfig, SimulationStats } from './Simulation'
 
+export { SimulationVisualizer, createSimulationVisualizer, Visualizer, Particles } from './SimulationVisualizer'
+

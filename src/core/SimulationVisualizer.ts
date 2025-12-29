@@ -40,6 +40,9 @@ export class SimulationVisualizer {
       domElement: container,
       initialColors: DEFAULT_TYPE_COLORS,
     })
+
+    // Set material properties (same as atomify)
+    this.visualizer.materials.particles.shininess = 50
   }
 
   /**
@@ -69,6 +72,13 @@ export class SimulationVisualizer {
 
     // Set up atom type radii
     this.setupAtomTypes()
+
+    // Set color for each particle based on its type
+    for (let i = 0; i < this.simulation.numAtoms; i++) {
+      const type = types[i]
+      const color = DEFAULT_TYPE_COLORS[type] ?? DEFAULT_TYPE_COLORS[0]
+      this.visualizer.setColor(i, color)
+    }
 
     // Add simulation box wireframe
     this.updateBoxGeometry()

@@ -1,12 +1,28 @@
 // Test setup file for vitest
-// Mock browser APIs not available in Node.js
+// Provides WebGPU support in Node.js using Dawn bindings
 
-// Mock WebGPU - we can't actually run GPU code in tests
-// but we can verify TypeScript logic
+import { create, globals } from 'webgpu'
+
+// Assign WebGPU constants (GPUBufferUsage, etc.) to global scope
+Object.assign(globalThis, globals)
+
+// Create navigator.gpu using Dawn implementation
+const gpu = create([])
+
 Object.defineProperty(globalThis, 'navigator', {
-  value: {
-    gpu: undefined, // WebGPU not available in tests
-  },
+  value: { gpu },
   writable: true,
+  configurable: true,
 })
+
+// Export a helper to get WebGPU adapter and device for tests
+export async function getWebGPUDevice(): Promise<GPUDevice | null> {
+  try {
+    const adapter = await navigator.gpu?.requestAdapter()
+    if (!adapter) return null
+    return await adapter.requestDevice()
+  } catch {
+    return null
+  }
+}
 

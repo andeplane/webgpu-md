@@ -135,10 +135,9 @@ export class SimulationVisualizer {
       this.visualizer.forceRender = true
     }
     
-    // Ensure point light is in scene (may have been removed by previous code)
-    if (this.visualizer.pointLight && !this.visualizer.scene.children.includes(this.visualizer.pointLight)) {
-      this.visualizer.scene.add(this.visualizer.pointLight)
-    }
+    // Set camera target to system center (not origin)
+    const systemCenter = this.simulation.box.getCenter()
+    this.visualizer.setCameraTarget(systemCenter)
   }
 
   /**

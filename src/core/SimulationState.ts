@@ -60,8 +60,10 @@ export class SimulationState {
     this._types = new Uint32Array(config.numAtoms)
     this._masses = new Float32Array(config.numAtoms)
 
-    // Default masses to 1.0 and upload to GPU
+    // Default types to 0 and masses to 1.0
+    this._types.fill(0)
     this._masses.fill(1.0)
+    // Note: We need to upload masses AFTER buffer creation, done below
     // Note: We need to upload masses AFTER buffer creation, done below
 
     // Create GPU buffers

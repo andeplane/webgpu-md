@@ -16,7 +16,7 @@ let stepsValue: HTMLElement | null = null
 // Energy tracking
 let initialEnergy: number | null = null
 let lastEnergyUpdate = 0
-const ENERGY_UPDATE_INTERVAL = 10 // Update energy display every N steps
+const ENERGY_UPDATE_INTERVAL = 50 // Update energy display every N steps (less frequent for large systems)
 
 async function initializeApp() {
   const app = document.getElementById('app')!
@@ -151,8 +151,8 @@ async function resetSimulation() {
 
   try {
     // Create a simple LJ liquid using FCC lattice
-    // 5x5x5 FCC unit cells = 4*125 = 500 atoms
-    simulation = await Simulation.createLJLiquid(5, 5, 5, {
+    // 30x30x30 FCC unit cells = 4*27000 = 108,000 atoms
+    simulation = await Simulation.createLJLiquid(30, 30, 30, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,
@@ -272,9 +272,9 @@ async function runBenchmarkMode() {
   updateStatus('Running benchmark (no visualization)...')
 
   try {
-    // Create a fresh simulation for benchmark (larger system)
-    // 6x6x6 FCC unit cells = 4*216 = 864 atoms
-    const benchSim = await Simulation.createLJLiquid(6, 6, 6, {
+    // Create a fresh simulation for benchmark (same system size)
+    // 30x30x30 FCC unit cells = 4*27000 = 108,000 atoms
+    const benchSim = await Simulation.createLJLiquid(30, 30, 30, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,

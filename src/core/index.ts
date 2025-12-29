@@ -7,6 +7,6 @@ export type { SimulationConfig, SimulationStats } from './Simulation'
 
 export { SimulationVisualizer, createSimulationVisualizer, Visualizer, Particles } from './SimulationVisualizer'
 
-export { runBenchmark, runScalingBenchmark } from './Benchmark'
+export { runBenchmark } from './Benchmark'
 export type { BenchmarkResult, BenchmarkConfig } from './Benchmark'
 

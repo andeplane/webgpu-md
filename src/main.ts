@@ -295,13 +295,13 @@ async function runBenchmarkMode() {
   if (resetBtn) resetBtn.disabled = true
 
   const resultEl = document.getElementById('benchmark-result')
-  if (resultEl) resultEl.innerHTML = 'Running benchmark...'
+  if (resultEl) resultEl.innerHTML = 'Creating simulation...'
   updateStatus('Running benchmark (no visualization)...')
 
   try {
     // Create a fresh simulation for benchmark
-    // 171x171x171 FCC unit cells = 4*5000211 = 20,000,844 atoms
-    const benchSim = await Simulation.createLJLiquid(171, 171, 171, {
+    // 50x50x50 FCC unit cells = 4*125000 = 500,000 atoms
+    const benchSim = await Simulation.createLJLiquid(50, 50, 50, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,
@@ -310,14 +310,11 @@ async function runBenchmarkMode() {
       cutoff: 2.5,
     })
 
+    if (resultEl) resultEl.innerHTML = `Running ${benchSim.numAtoms} atoms...`
+
     const result = await runBenchmark(benchSim, {
       warmupSteps: 100,
       benchmarkSteps: 1000,
-      onProgress: (step, total) => {
-        if (resultEl) {
-          resultEl.innerHTML = `Progress: ${step}/${total}`
-        }
-      }
     })
 
     // Display results

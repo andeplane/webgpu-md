@@ -84,7 +84,7 @@ export class Simulation {
     const dt = config.dt ?? 0.005
     const cutoff = config.cutoff ?? 2.5
     const skin = config.skin ?? 0.3
-    const maxNeighbors = config.maxNeighbors ?? 128
+    const maxNeighbors = config.maxNeighbors ?? 64  // Reduced from 128 to improve stability
     const neighEvery = config.neighEvery ?? 10
 
     // Create state
@@ -329,14 +329,37 @@ export class Simulation {
   /**
    * Get neighbor list stats for debugging
    */
-  getNeighborListStats() {
+  async getNeighborListStats() {
+    const counts = await this.neighborList.readNeighborCounts()
+    let totalNeighbors = 0
+    let maxNeighborsFound = 0
+    for (let i = 0; i < counts.length; i++) {
+      totalNeighbors += counts[i]
+      maxNeighborsFound = Math.max(maxNeighborsFound, counts[i])
+    }
+
     return {
       maxNeighbors: this.neighborList.maxNeighbors,
       numCells: this.neighborList.cellList.numCells,
       numCellsX: this.neighborList.cellList.numCellsX,
       numCellsY: this.neighborList.cellList.numCellsY,
       numCellsZ: this.neighborList.cellList.numCellsZ,
+      avgNeighbors: totalNeighbors / this.numAtoms,
+      maxNeighborsFound,
     }
+  }
+
+  /**
+   * Check if the simulation is stable (no NaNs in positions)
+   */
+  async checkStability(): Promise<{ stable: boolean; message?: string }> {
+    const pos = await this.readPositions()
+    for (let i = 0; i < pos.length; i++) {
+      if (isNaN(pos[i])) {
+        return { stable: false, message: `NaN detected at index ${i}` }
+      }
+    }
+    return { stable: true }
   }
 
   /**

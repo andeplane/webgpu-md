@@ -45,6 +45,12 @@ export class WebGPUContext {
       requiredLimits: config.requiredLimits,
     })
 
+    // Log limits for debugging
+    console.log('WebGPU Device Limits:')
+    console.log(`  maxStorageBufferBindingSize: ${(device.limits.maxStorageBufferBindingSize / 1024 / 1024).toFixed(0)} MB`)
+    console.log(`  maxComputeWorkgroupStorageSize: ${device.limits.maxComputeWorkgroupStorageSize} bytes`)
+    console.log(`  maxComputeInvocationsPerWorkgroup: ${device.limits.maxComputeInvocationsPerWorkgroup}`)
+
     // Set up error handling
     device.lost.then((info) => {
       console.error('WebGPU device lost:', info.message)

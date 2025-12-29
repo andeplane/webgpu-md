@@ -26,13 +26,11 @@ export interface BenchmarkConfig {
   warmupSteps?: number
   /** Number of benchmark steps */
   benchmarkSteps?: number
-  /** Callback for progress updates */
-  onProgress?: (step: number, totalSteps: number) => void
 }
 
 /**
  * Run a benchmark on a simulation without visualization
- * Measures raw simulation performance (forces, neighbor lists, integration)
+ * Uses the exact same simulation.run() method as normal execution
  */
 export async function runBenchmark(
   simulation: Simulation,
@@ -40,36 +38,24 @@ export async function runBenchmark(
 ): Promise<BenchmarkResult> {
   const warmupSteps = config.warmupSteps ?? 100
   const benchmarkSteps = config.benchmarkSteps ?? 1000
-  const onProgress = config.onProgress
 
   console.log(`Benchmark: ${simulation.numAtoms} atoms`)
   console.log(`Warmup: ${warmupSteps} steps, Benchmark: ${benchmarkSteps} steps`)
 
-  // Warmup phase - let GPU compile shaders and warm up caches
+  // Warmup phase - uses the SAME run() method
   console.log('Running warmup...')
-  for (let i = 0; i < warmupSteps; i++) {
-    simulation.step()
-  }
-
-  // Wait for GPU to finish warmup
+  simulation.run(warmupSteps)
   await simulation.ctx.waitForGPU()
 
-  // Benchmark phase
+  // Benchmark phase - uses the SAME run() method
   console.log('Running benchmark...')
   const startTime = performance.now()
 
-  for (let i = 0; i < benchmarkSteps; i++) {
-    simulation.step()
-    
-    if (onProgress && i % 100 === 0) {
-      onProgress(i, benchmarkSteps)
-    }
-  }
+  simulation.run(benchmarkSteps)
 
-  // Wait for all GPU work to complete
   await simulation.ctx.waitForGPU()
-
   const endTime = performance.now()
+
   const totalTimeSeconds = (endTime - startTime) / 1000
 
   // Calculate metrics
@@ -98,46 +84,3 @@ export async function runBenchmark(
 
   return result
 }
-
-/**
- * Run a series of benchmarks with increasing system sizes
- * 
- * @param sizes - Array of FCC unit cell counts per dimension (e.g., [4, 5, 6])
- *                Each n gives 4*n^3 atoms (FCC has 4 atoms per unit cell)
- */
-export async function runScalingBenchmark(
-  sizes: number[],
-  config: BenchmarkConfig & {
-    density?: number
-    temperature?: number
-  } = {}
-): Promise<BenchmarkResult[]> {
-  const { Simulation } = await import('./Simulation')
-  const results: BenchmarkResult[] = []
-
-  for (const n of sizes) {
-    // Create cubic FCC system with n^3 unit cells = 4*n^3 atoms
-    const simulation = await Simulation.createLJLiquid(n, n, n, {
-      density: config.density ?? 0.8,
-      temperature: config.temperature ?? 1.0,
-    })
-
-    // Run benchmark
-    const result = await runBenchmark(simulation, config)
-    results.push(result)
-
-    // Cleanup
-    simulation.destroy()
-  }
-
-  // Print scaling summary
-  console.log('\n=== Scaling Summary ===')
-  console.log('Atoms\t\tM atom-steps/s\tns/atom-step')
-  for (const r of results) {
-    console.log(`${r.numAtoms}\t\t${r.millionAtomStepsPerSecond.toFixed(2)}\t\t${r.nsPerAtomStep.toFixed(2)}`)
-  }
-  console.log('=======================\n')
-
-  return results
-}
-

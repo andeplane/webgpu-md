@@ -5,7 +5,6 @@ A high-performance molecular dynamics simulation engine using WebGPU for all com
 ## Features
 
 - **Full WebGPU Compute**: Forces, neighbor lists, and integration all run on the GPU
-- **LAMMPS-style algorithms**: Cell lists and Verlet neighbor lists inspired by LAMMPS KOKKOS package
 - **Lennard-Jones potential**: Extensible pair style system for adding new potentials
 - **Real-time visualization**: Direct integration with omovi for zero-copy rendering
 - **LAMMPS file support**: Read LAMMPS data files

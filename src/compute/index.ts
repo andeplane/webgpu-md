@@ -7,3 +7,5 @@ export {
 } from './WebGPUContext'
 export type { WebGPUContextConfig } from './WebGPUContext'
 
+export { CellList } from './CellList'
+

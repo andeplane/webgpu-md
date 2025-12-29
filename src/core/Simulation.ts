@@ -327,6 +327,42 @@ export class Simulation {
   }
 
   /**
+   * Compute total energy (kinetic + potential)
+   * This requires GPU readback and is async
+   */
+  async computeEnergy(): Promise<{
+    kinetic: number
+    potential: number
+    total: number
+    temperature: number
+  }> {
+    // Read velocities for kinetic energy
+    await this.state.readVelocities()
+    const kinetic = this.state.computeKineticEnergy()
+    const temperature = this.state.computeTemperature()
+
+    // Compute potential energy (forces are also computed as a side effect)
+    const potential = await this.pairStyle.computeWithEnergy(this.state, this.neighborList)
+
+    return {
+      kinetic,
+      potential,
+      total: kinetic + potential,
+      temperature,
+    }
+  }
+
+  /**
+   * Compute kinetic energy and temperature only (faster, no force recalculation)
+   */
+  async computeKineticEnergy(): Promise<{ kinetic: number; temperature: number }> {
+    await this.state.readVelocities()
+    const kinetic = this.state.computeKineticEnergy()
+    const temperature = this.state.computeTemperature()
+    return { kinetic, temperature }
+  }
+
+  /**
    * Destroy GPU resources
    */
   destroy(): void {

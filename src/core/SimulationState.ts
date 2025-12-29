@@ -32,6 +32,7 @@ export class SimulationState {
 
   // Staging buffers for CPU read-back
   positionsStagingBuffer: GPUBuffer
+  velocitiesStagingBuffer: GPUBuffer
   typesStagingBuffer: GPUBuffer
 
   // Simulation box
@@ -96,6 +97,12 @@ export class SimulationState {
       this._positions.byteLength,
       GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
       'positions-staging'
+    )
+
+    this.velocitiesStagingBuffer = this.createBuffer(
+      this._velocities.byteLength,
+      GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      'velocities-staging'
     )
 
     this.typesStagingBuffer = this.createBuffer(
@@ -209,6 +216,55 @@ export class SimulationState {
 
     this._types.set(data)
     return this._types
+  }
+
+  /** Read velocities back from GPU (async) */
+  async readVelocities(): Promise<Float32Array> {
+    await this.device.queue.onSubmittedWorkDone()
+    
+    const commandEncoder = this.device.createCommandEncoder()
+    commandEncoder.copyBufferToBuffer(
+      this.velocitiesBuffer,
+      0,
+      this.velocitiesStagingBuffer,
+      0,
+      this._velocities.byteLength
+    )
+    this.device.queue.submit([commandEncoder.finish()])
+
+    await this.velocitiesStagingBuffer.mapAsync(GPUMapMode.READ)
+    const data = new Float32Array(this.velocitiesStagingBuffer.getMappedRange().slice(0))
+    this.velocitiesStagingBuffer.unmap()
+
+    this._velocities.set(data)
+    return this._velocities
+  }
+
+  /** 
+   * Compute kinetic energy: KE = 0.5 * sum(m_i * v_i^2)
+   * Note: Call readVelocities() first to ensure velocities are up to date
+   */
+  computeKineticEnergy(): number {
+    let ke = 0
+    for (let i = 0; i < this.numAtoms; i++) {
+      const vx = this._velocities[i * 3 + 0]
+      const vy = this._velocities[i * 3 + 1]
+      const vz = this._velocities[i * 3 + 2]
+      const v2 = vx * vx + vy * vy + vz * vz
+      ke += 0.5 * this._masses[i] * v2
+    }
+    return ke
+  }
+
+  /**
+   * Compute instantaneous temperature: T = (2/3) * KE / (N * kB)
+   * In reduced units (kB = 1): T = (2/3) * KE / N
+   */
+  computeTemperature(): number {
+    const ke = this.computeKineticEnergy()
+    // In reduced units, kB = 1
+    // T = 2 * KE / (3 * N * kB) for 3D
+    return (2.0 / 3.0) * ke / this.numAtoms
   }
 
   /** Get CPU positions (may be stale, call readPositions() first) */

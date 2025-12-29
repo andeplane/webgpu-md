@@ -13,6 +13,11 @@ let showBoxCheckbox: HTMLInputElement | null = null
 let stepsSlider: HTMLInputElement | null = null
 let stepsValue: HTMLElement | null = null
 
+// Energy tracking
+let initialEnergy: number | null = null
+let lastEnergyUpdate = 0
+const ENERGY_UPDATE_INTERVAL = 10 // Update energy display every N steps
+
 async function initializeApp() {
   const app = document.getElementById('app')!
   
@@ -78,6 +83,24 @@ async function initializeApp() {
               <span id="info-box">-</span>
             </div>
           </div>
+          
+          <div class="panel">
+            <h2>Energy</h2>
+            <div class="info-grid energy-grid">
+              <span class="label">KE:</span>
+              <span id="info-ke">-</span>
+              <span class="label">PE:</span>
+              <span id="info-pe">-</span>
+              <span class="label">Total:</span>
+              <span id="info-total" class="highlight">-</span>
+              <span class="label">Temp:</span>
+              <span id="info-temp">-</span>
+            </div>
+            <div class="energy-drift">
+              <span class="label">ΔE/E₀:</span>
+              <span id="info-drift">-</span>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
@@ -121,6 +144,10 @@ async function resetSimulation() {
   if (simulation) {
     simulation.destroy()
   }
+  
+  // Reset energy tracking
+  initialEnergy = null
+  lastEnergyUpdate = 0
 
   try {
     // Create a simple LJ liquid using FCC lattice
@@ -143,6 +170,9 @@ async function resetSimulation() {
 
     // Update info display
     updateInfo()
+    
+    // Compute initial energy
+    await updateEnergy()
 
     // Enable controls
     if (playBtn) playBtn.disabled = false
@@ -162,12 +192,19 @@ function togglePlay() {
     visualizer.stop()
     if (playBtn) playBtn.textContent = '▶ Play'
     if (stepBtn) stepBtn.disabled = false
+    // Update energy when stopping
+    updateEnergy()
   } else {
     visualizer.start({
       stepsPerFrame: parseInt(stepsSlider?.value ?? '10'),
-      onStep: (step) => {
+      onStep: async (step) => {
         const stepEl = document.getElementById('info-step')
         if (stepEl) stepEl.textContent = step.toString()
+        
+        // Update energy periodically
+        if (step - lastEnergyUpdate >= ENERGY_UPDATE_INTERVAL) {
+          await updateEnergy()
+        }
       }
     })
     if (playBtn) playBtn.textContent = '⏸ Pause'
@@ -190,6 +227,10 @@ async function singleStep() {
     if (stepEl && simulation) {
       stepEl.textContent = simulation.timestep.toString()
     }
+    
+    // Update energy display
+    await updateEnergy()
+    
     updateStatus(`Step ${simulation?.timestep} complete`)
   } catch (error) {
     console.error('Error during step:', error)
@@ -304,6 +345,42 @@ function updateInfo() {
   if (boxEl) {
     const [lx] = simulation.box.dimensions
     boxEl.textContent = `${lx.toFixed(1)}³`
+  }
+}
+
+async function updateEnergy() {
+  if (!simulation) return
+  
+  try {
+    const energy = await simulation.computeEnergy()
+    
+    const keEl = document.getElementById('info-ke')
+    const peEl = document.getElementById('info-pe')
+    const totalEl = document.getElementById('info-total')
+    const tempEl = document.getElementById('info-temp')
+    const driftEl = document.getElementById('info-drift')
+    
+    if (keEl) keEl.textContent = energy.kinetic.toFixed(2)
+    if (peEl) peEl.textContent = energy.potential.toFixed(2)
+    if (totalEl) totalEl.textContent = energy.total.toFixed(2)
+    if (tempEl) tempEl.textContent = energy.temperature.toFixed(3)
+    
+    // Track energy drift
+    if (initialEnergy === null) {
+      initialEnergy = energy.total
+    }
+    
+    if (driftEl && initialEnergy !== null && Math.abs(initialEnergy) > 0.001) {
+      const drift = (energy.total - initialEnergy) / Math.abs(initialEnergy)
+      const driftPercent = (drift * 100).toFixed(4)
+      const driftClass = Math.abs(drift) < 0.01 ? 'good' : Math.abs(drift) < 0.1 ? 'warn' : 'bad'
+      driftEl.textContent = `${driftPercent}%`
+      driftEl.className = driftClass
+    }
+    
+    lastEnergyUpdate = simulation.timestep
+  } catch (error) {
+    console.error('Error computing energy:', error)
   }
 }
 

@@ -218,6 +218,45 @@ input[type="range"]::-webkit-slider-thumb:hover {
   text-align: right;
 }
 
+.info-grid .highlight {
+  color: var(--accent-primary) !important;
+  font-size: 1.1em;
+}
+
+/* Energy display */
+.energy-grid {
+  margin-bottom: 0.75rem;
+}
+
+.energy-drift {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-tertiary);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.energy-drift .label {
+  color: var(--text-secondary);
+}
+
+.energy-drift .good {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.energy-drift .warn {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.energy-drift .bad {
+  color: var(--error);
+  font-weight: 600;
+}
+
 /* Checkbox */
 .checkbox-label {
   display: flex;

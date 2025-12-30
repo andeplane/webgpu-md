@@ -58,6 +58,34 @@ html, body {
   margin-top: 0.25rem;
 }
 
+.github-corner {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1000;
+  /* Match the header height: padding (1rem * 2) + h1 (1.5rem) + subtitle (~1.2rem) + margin */
+  width: 104px;
+  height: 104px;
+}
+
+.github-corner svg {
+  fill: #151513;
+  color: #fff;
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.github-corner:hover .octo-arm {
+  animation: octocat-wave 560ms ease-in-out;
+}
+
+@keyframes octocat-wave {
+  0%, 100% { transform: rotate(0); }
+  20%, 60% { transform: rotate(-25deg); }
+  40%, 80% { transform: rotate(10deg); }
+}
+
 .main-content {
   display: flex;
   flex: 1;

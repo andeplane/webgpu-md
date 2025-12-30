@@ -15,6 +15,7 @@ let stepsSlider: HTMLInputElement | null = null
 let stepsValue: HTMLElement | null = null
 let initTempInput: HTMLInputElement | null = null
 let unitCellsInput: HTMLInputElement | null = null
+let densityInput: HTMLInputElement | null = null
 
 // Energy tracking
 let initialEnergy: number | null = null
@@ -29,7 +30,7 @@ async function initializeApp() {
     <div class="app-container">
       <header class="header">
         <h1>WebGPU Molecular Dynamics</h1>
-        <p class="subtitle">Lennard-Jones System Simulation</p>
+        <p class="subtitle">Lennard-Jones System Simulation<br>Vibe coded by Anders Hafreager, University of Oslo</p>
       </header>
       
       <div class="main-content">
@@ -48,12 +49,16 @@ async function initializeApp() {
           <div class="panel">
             <h2>Initial Conditions</h2>
             <div class="input-group">
+              <label for="unit-cells">Unit cells (n³):</label>
+              <input type="number" id="unit-cells" value="60" min="2" max="200" step="1">
+            </div>
+            <div class="input-group">
               <label for="init-temp">Temperature (T*):</label>
               <input type="number" id="init-temp" value="0.8" min="0.001" max="5" step="0.01">
             </div>
             <div class="input-group">
-              <label for="unit-cells">Unit cells (n³):</label>
-              <input type="number" id="unit-cells" value="60" min="2" max="200" step="1">
+              <label for="density">Density (ρ*):</label>
+              <input type="number" id="density" value="0.8" min="0.1" max="2.0" step="0.1">
             </div>
           </div>
           
@@ -132,6 +137,7 @@ async function initializeApp() {
   stepsValue = document.getElementById('steps-value')
   initTempInput = document.getElementById('init-temp') as HTMLInputElement
   unitCellsInput = document.getElementById('unit-cells') as HTMLInputElement
+  densityInput = document.getElementById('density') as HTMLInputElement
 
   // Set up event listeners
   playBtn?.addEventListener('click', togglePlay)
@@ -194,6 +200,7 @@ async function resetSimulation() {
     // Get values from UI inputs
     const initTemp = parseFloat(initTempInput?.value ?? '0.8')
     const unitCells = parseInt(unitCellsInput?.value ?? '60')
+    const density = parseFloat(densityInput?.value ?? '0.8')
     
     // Create a simple LJ liquid using FCC lattice
     // n³ FCC unit cells = 4*n³ atoms
@@ -201,7 +208,7 @@ async function resetSimulation() {
     updateStatus(`Creating LJ liquid (${numAtoms} atoms)...`)
     
     simulation = await Simulation.createLJLiquid(unitCells, unitCells, unitCells, {
-      density: 0.8,
+      density: density,
       temperature: initTemp,
       epsilon: 1.0,
       sigma: 1.0,

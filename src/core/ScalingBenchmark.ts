@@ -19,20 +19,28 @@ export interface ScalingResult {
 
 /**
  * System sizes for scaling benchmark
- * FCC unit cell sizes providing roughly 256k increments up to 4M atoms
+ * Starts at 4,000 atoms and increases by 25% each time up to ~4M atoms
  */
-const SYSTEM_SIZES = [
-  { nx: 10, ny: 10, nz: 10 }, // 4,000 atoms
-  { nx: 40, ny: 40, nz: 40 }, // 256,000 atoms
-  { nx: 50, ny: 50, nz: 50 }, // 500,000 atoms
-  { nx: 58, ny: 58, nz: 58 }, // 780,448 atoms
-  { nx: 65, ny: 65, nz: 65 }, // 1,098,500 atoms
-  { nx: 72, ny: 72, nz: 72 }, // 1,492,992 atoms
-  { nx: 80, ny: 80, nz: 80 }, // 2,048,000 atoms
-  { nx: 87, ny: 87, nz: 87 }, // 2,628,072 atoms
-  { nx: 93, ny: 93, nz: 93 }, // 3,214,108 atoms
-  { nx: 100, ny: 100, nz: 100 }, // 4,000,000 atoms
-]
+function getSystemSizes() {
+  const sizes: { nx: number, ny: number, nz: number }[] = []
+  let currentAtoms = 4000
+  const maxAtoms = 4000000
+  const multiplier = 1.25
+
+  while (currentAtoms <= maxAtoms * 1.1) { // Allow slightly over 4M for the last step
+    const n = Math.round(Math.pow(currentAtoms / 4, 1/3))
+    
+    // Ensure we don't add the same size twice due to rounding
+    if (sizes.length === 0 || sizes[sizes.length - 1].nx !== n) {
+      sizes.push({ nx: n, ny: n, nz: n })
+    }
+    
+    currentAtoms *= multiplier
+  }
+  return sizes
+}
+
+const SYSTEM_SIZES = getSystemSizes()
 
 /**
  * Run scaling benchmark across multiple system sizes

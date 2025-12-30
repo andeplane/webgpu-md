@@ -67,9 +67,6 @@ export class BenchmarkModal {
           <div class="benchmark-modal-progress" id="benchmark-modal-progress" style="display: none;">
             <div class="progress-text">Preparing...</div>
           </div>
-          <div class="benchmark-modal-chart-container">
-            <canvas id="benchmark-chart"></canvas>
-          </div>
           <div class="benchmark-modal-chart-toggle">
             <label>
               <input type="radio" name="y-axis-metric" value="stepsPerSec">
@@ -79,6 +76,9 @@ export class BenchmarkModal {
               <input type="radio" name="y-axis-metric" value="mAtomStepsPerSec" checked>
               M atom-steps/sec
             </label>
+          </div>
+          <div class="benchmark-modal-chart-container">
+            <canvas id="benchmark-chart"></canvas>
           </div>
           <div class="benchmark-modal-table-container">
             <table class="benchmark-table" id="benchmark-table">

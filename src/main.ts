@@ -1,5 +1,5 @@
 import './style.css'
-import { Simulation, SimulationVisualizer, runBenchmark } from './core'
+import { Simulation, SimulationVisualizer } from './core'
 import { BenchmarkModal } from './ui/BenchmarkModal'
 
 // UI elements
@@ -9,7 +9,6 @@ let statusEl: HTMLElement | null = null
 let playBtn: HTMLButtonElement | null = null
 let stepBtn: HTMLButtonElement | null = null
 let resetBtn: HTMLButtonElement | null = null
-let benchmarkBtn: HTMLButtonElement | null = null
 let scalingBenchmarkBtn: HTMLButtonElement | null = null
 let showBoxCheckbox: HTMLInputElement | null = null
 let stepsSlider: HTMLInputElement | null = null
@@ -77,12 +76,7 @@ async function initializeApp() {
           
           <div class="panel">
             <h2>Benchmark</h2>
-            <label class="checkbox-label">
-              <input type="checkbox" id="profile-checkbox">
-              Enable profiling (slower)
-            </label>
-            <button id="benchmark-btn" class="benchmark-btn">Run Benchmark</button>
-            <button id="scaling-benchmark-btn" class="benchmark-btn">Scaling Benchmark</button>
+            <button id="scaling-benchmark-btn" class="benchmark-btn">Run benchmark</button>
             <div id="benchmark-result" class="benchmark-result"></div>
           </div>
           
@@ -132,7 +126,6 @@ async function initializeApp() {
   playBtn = document.getElementById('play-btn') as HTMLButtonElement
   stepBtn = document.getElementById('step-btn') as HTMLButtonElement
   resetBtn = document.getElementById('reset-btn') as HTMLButtonElement
-  benchmarkBtn = document.getElementById('benchmark-btn') as HTMLButtonElement
   scalingBenchmarkBtn = document.getElementById('scaling-benchmark-btn') as HTMLButtonElement
   showBoxCheckbox = document.getElementById('show-box') as HTMLInputElement
   stepsSlider = document.getElementById('steps-slider') as HTMLInputElement
@@ -144,7 +137,6 @@ async function initializeApp() {
   playBtn?.addEventListener('click', togglePlay)
   stepBtn?.addEventListener('click', singleStep)
   resetBtn?.addEventListener('click', resetSimulation)
-  benchmarkBtn?.addEventListener('click', runBenchmarkMode)
   showBoxCheckbox?.addEventListener('change', toggleShowBox)
   stepsSlider?.addEventListener('input', updateStepsPerFrame)
 
@@ -290,114 +282,6 @@ function updateStepsPerFrame() {
   const value = parseInt(stepsSlider.value)
   stepsValue.textContent = value.toString()
   visualizer.setStepsPerFrame(value)
-}
-
-async function runBenchmarkMode() {
-  if (!benchmarkBtn) return
-  
-  // Stop visualization if running
-  if (visualizer?.running) {
-    visualizer.stop()
-    if (playBtn) playBtn.textContent = '▶ Play'
-    if (stepBtn) stepBtn.disabled = false
-  }
-
-  // Disable controls during benchmark
-  benchmarkBtn.disabled = true
-  if (playBtn) playBtn.disabled = true
-  if (stepBtn) stepBtn.disabled = true
-  if (resetBtn) resetBtn.disabled = true
-
-  const resultEl = document.getElementById('benchmark-result')
-  const profileCheckbox = document.getElementById('profile-checkbox') as HTMLInputElement
-  const enableProfiling = profileCheckbox?.checked ?? false
-  
-  if (resultEl) resultEl.innerHTML = 'Creating simulation...'
-  updateStatus('Running benchmark (no visualization)...')
-
-  let benchSim: Simulation | undefined
-  try {
-    // Create a fresh simulation for benchmark
-    // 80x80x80 FCC unit cells = 4*512000 = 2,048,000 atoms
-    benchSim = await Simulation.createLJLiquid(80, 80, 80, {
-      density: 0.8,
-      temperature: 1.0,
-      epsilon: 1.0,
-      sigma: 1.0,
-      dt: 0.005,
-      cutoff: 2.5,
-    })
-
-    if (resultEl) resultEl.innerHTML = `Running ${benchSim.numAtoms} atoms...`
-
-    const result = await runBenchmark(benchSim, {
-      warmupSteps: 100,
-      benchmarkSteps: 1000,
-      profile: enableProfiling,
-    })
-
-    // Display results
-    if (resultEl) {
-      let html = `
-        <div class="bench-stat">
-          <span class="bench-label">Atoms:</span>
-          <span class="bench-value">${result.numAtoms}</span>
-        </div>
-        <div class="bench-stat">
-          <span class="bench-label">Steps/sec:</span>
-          <span class="bench-value">${result.stepsPerSecond.toFixed(1)}</span>
-        </div>
-        <div class="bench-stat highlight">
-          <span class="bench-label">M atom-steps/sec:</span>
-          <span class="bench-value">${result.millionAtomStepsPerSecond.toFixed(2)}</span>
-        </div>
-        <div class="bench-stat">
-          <span class="bench-label">ns/atom-step:</span>
-          <span class="bench-value">${result.nsPerAtomStep.toFixed(2)}</span>
-        </div>
-      `
-      
-      // Add profiling breakdown if available
-      if (result.profiling && result.profiling.total > 0) {
-        const p = result.profiling
-        const pct = (val: number) => ((val / p.total) * 100).toFixed(1)
-        const ms = (val: number) => (val / p.stepCount).toFixed(2)
-        
-        html += `
-          <div class="bench-divider"></div>
-          <div class="bench-stat">
-            <span class="bench-label">Force calc:</span>
-            <span class="bench-value">${pct(p.forceCalculation)}% (${ms(p.forceCalculation)} ms)</span>
-          </div>
-          <div class="bench-stat">
-            <span class="bench-label">Neighbor list:</span>
-            <span class="bench-value">${pct(p.neighborListBuild)}% (${ms(p.neighborListBuild)} ms)</span>
-          </div>
-          <div class="bench-stat">
-            <span class="bench-label">Integration:</span>
-            <span class="bench-value">${pct(p.integration)}% (${ms(p.integration)} ms)</span>
-          </div>
-        `
-      }
-      
-      resultEl.innerHTML = html
-    }
-
-    updateStatus('Benchmark complete!')
-
-  } catch (error) {
-    if (resultEl) resultEl.innerHTML = `Error: ${error}`
-    updateStatus('Benchmark failed')
-  } finally {
-    // Clean up benchmark simulation (always runs, even on error)
-    await benchSim?.destroy()
-  }
-
-  // Re-enable controls
-  benchmarkBtn.disabled = false
-  if (playBtn) playBtn.disabled = false
-  if (stepBtn) stepBtn.disabled = false
-  if (resetBtn) resetBtn.disabled = false
 }
 
 function updateInfo() {

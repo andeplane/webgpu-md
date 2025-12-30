@@ -28,7 +28,7 @@ export class SimulationVisualizer {
   private boxGroup: THREE.Group | null = null
   private animationFrameId: number | null = null
   private isRunning = false
-  private stepsPerFrame = 10
+  private stepsPerFrame = 5
   private onStep?: (step: number) => void
   private showBox = true
 
@@ -193,7 +193,7 @@ export class SimulationVisualizer {
   } = {}): void {
     if (this.isRunning) return
 
-    this.stepsPerFrame = options.stepsPerFrame ?? 10
+    this.stepsPerFrame = options.stepsPerFrame ?? 5
     this.onStep = options.onStep
     this.isRunning = true
     this.loop()

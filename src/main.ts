@@ -49,7 +49,7 @@ async function initializeApp() {
             <h2>Initial Conditions</h2>
             <div class="input-group">
               <label for="init-temp">Temperature (T*):</label>
-              <input type="number" id="init-temp" value="0.01" min="0.001" max="5" step="0.01">
+              <input type="number" id="init-temp" value="0.8" min="0.001" max="5" step="0.01">
             </div>
             <div class="input-group">
               <label for="unit-cells">Unit cells (n³):</label>
@@ -61,8 +61,8 @@ async function initializeApp() {
             <h2>Speed</h2>
             <div class="slider-group">
               <label for="steps-slider">Steps/frame:</label>
-              <input type="range" id="steps-slider" min="1" max="100" value="10">
-              <span id="steps-value">10</span>
+              <input type="range" id="steps-slider" min="1" max="100" value="5">
+              <span id="steps-value">5</span>
             </div>
           </div>
           
@@ -192,7 +192,7 @@ async function resetSimulation() {
 
   try {
     // Get values from UI inputs
-    const initTemp = parseFloat(initTempInput?.value ?? '0.01')
+    const initTemp = parseFloat(initTempInput?.value ?? '0.8')
     const unitCells = parseInt(unitCellsInput?.value ?? '60')
     
     // Create a simple LJ liquid using FCC lattice
@@ -244,7 +244,7 @@ function togglePlay() {
     updateEnergy()
   } else {
     visualizer.start({
-      stepsPerFrame: parseInt(stepsSlider?.value ?? '10'),
+      stepsPerFrame: parseInt(stepsSlider?.value ?? '5'),
       onStep: async (step) => {
         const stepEl = document.getElementById('info-step')
         if (stepEl) stepEl.textContent = step.toString()

@@ -53,7 +53,7 @@ async function initializeApp() {
             </div>
             <div class="input-group">
               <label for="unit-cells">Unit cells (n³):</label>
-              <input type="number" id="unit-cells" value="10" min="2" max="50" step="1">
+              <input type="number" id="unit-cells" value="60" min="2" max="200" step="1">
             </div>
           </div>
           
@@ -174,7 +174,7 @@ async function resetSimulation() {
   try {
     // Get values from UI inputs
     const initTemp = parseFloat(initTempInput?.value ?? '0.01')
-    const unitCells = parseInt(unitCellsInput?.value ?? '10')
+    const unitCells = parseInt(unitCellsInput?.value ?? '60')
     
     // Create a simple LJ liquid using FCC lattice
     // n³ FCC unit cells = 4*n³ atoms

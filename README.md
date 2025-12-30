@@ -2,8 +2,7 @@
 
 A high-performance molecular dynamics simulation engine running entirely in the browser using WebGPU for all computations. Real-time visualization of 1-2 million atoms at interactive framerates.
 
-**Made by Anders Hafreager, University of Oslo**  
-*Vibe coded*
+**Made by Anders Hafreager, University of Oslo**
 
 ## Try it out
 
@@ -86,7 +85,3 @@ For more powerful molecular dynamics capabilities, check out [Atomify](https://g
 
 MIT
 
-## Credits
-
-**Made by Anders Hafreager, University of Oslo**  
-*Vibe coded*

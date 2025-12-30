@@ -235,19 +235,16 @@ export class VelocityVerlet extends Integrator {
   /**
    * Get the maximum displacement squared since last rebuild
    * Returns the actual squared displacement (unscaled)
-   * Uses a lock to prevent concurrent calls that would cause buffer mapping conflicts
    */
   async getMaxDisplacementSq(): Promise<number> {
-    // Wait for any pending call to complete first
-    if (this.pendingGetMaxDisplacement) {
+    // Wait for any pending call to complete - use while to re-check after resuming
+    while (this.pendingGetMaxDisplacement) {
       await this.pendingGetMaxDisplacement
     }
 
-    // Create a new promise for this call
     const promise = (async () => {
       try {
         // Wait for any pending GPU work to complete before using staging buffer
-        // This prevents "buffer used in submit while pending map" errors
         await this.ctx.waitForGPU()
 
         // Copy GPU buffer to staging buffer
@@ -271,14 +268,12 @@ export class VelocityVerlet extends Integrator {
           const data = new Uint32Array(this.maxDisplacementStagingBuffer.getMappedRange())
           scaledValue = data[0]
         } finally {
-          // Always unmap, even if reading fails
           this.maxDisplacementStagingBuffer.unmap()
         }
 
         // Unscale: we multiplied by 1e6 in shader
         return scaledValue / 1000000.0
       } finally {
-        // Clear the pending promise when done
         if (this.pendingGetMaxDisplacement === promise) {
           this.pendingGetMaxDisplacement = null
         }

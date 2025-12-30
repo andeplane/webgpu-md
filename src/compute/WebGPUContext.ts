@@ -40,9 +40,19 @@ export class WebGPUContext {
 
     console.log('WebGPU Adapter acquired')
 
+    // Query adapter limits
+    const adapterLimits = adapter.limits
+
+    // Request the adapter's maximum storage buffer size
+    const requiredLimits: Record<string, number> = {
+      ...config.requiredLimits,
+      maxStorageBufferBindingSize: adapterLimits.maxStorageBufferBindingSize,
+      maxBufferSize: adapterLimits.maxBufferSize,
+    }
+
     const device = await adapter.requestDevice({
       requiredFeatures: config.requiredFeatures,
-      requiredLimits: config.requiredLimits,
+      requiredLimits,
     })
 
     // Log limits for debugging

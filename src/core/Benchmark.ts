@@ -1,6 +1,5 @@
 import type { Simulation } from './Simulation'
 import type { ProfileStats } from './SimulationProfiler'
-import { VelocityVerlet } from '../integrators/VelocityVerlet'
 
 /**
  * Benchmark result

@@ -242,6 +242,7 @@ export class VelocityVerlet extends Integrator {
       await this.pendingGetMaxDisplacement
     }
 
+    let promiseRef: Promise<number> | null = null
     const promise = (async () => {
       try {
         // Wait for any pending GPU work to complete before using staging buffer
@@ -274,12 +275,13 @@ export class VelocityVerlet extends Integrator {
         // Unscale: we multiplied by 1e6 in shader
         return scaledValue / 1000000.0
       } finally {
-        if (this.pendingGetMaxDisplacement === promise) {
+        if (this.pendingGetMaxDisplacement === promiseRef) {
           this.pendingGetMaxDisplacement = null
         }
       }
     })()
 
+    promiseRef = promise
     this.pendingGetMaxDisplacement = promise
     return promise
   }

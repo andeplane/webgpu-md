@@ -155,12 +155,13 @@ export class SimulationVisualizer {
     this.visualizer.setCameraTarget(systemCenter)
     
     // Position camera outside the system box
+    // Less height (z), more x than y, more y than z
     const [lx, ly, lz] = this.simulation.box.dimensions
     const maxDim = Math.max(lx, ly, lz)
     const cameraPos = new THREE.Vector3(
-      systemCenter.x + maxDim * 0.8,
-      systemCenter.y + maxDim * 0.8,
-      systemCenter.z + maxDim * 0.8
+      systemCenter.x - maxDim * 0.1,
+      systemCenter.y + maxDim * 0.6,
+      systemCenter.z + maxDim * 1.4
     )
     this.visualizer.setCameraPosition(cameraPos)
   }

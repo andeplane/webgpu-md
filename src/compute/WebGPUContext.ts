@@ -63,8 +63,8 @@ export class WebGPUContext {
 
     // Set up error handling
     device.lost.then((info) => {
-      console.error('WebGPU device lost:', info.message)
       if (info.reason !== 'destroyed') {
+        console.error('WebGPU device lost:', info.message)
         // Could attempt to recreate device here
         throw new Error(`WebGPU device lost: ${info.message}`)
       }

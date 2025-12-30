@@ -573,10 +573,10 @@ export class Simulation {
   /**
    * Destroy GPU resources
    */
-  destroy(): void {
+  async destroy(): Promise<void> {
     this.state.destroy()
     this.neighborList.destroy()
-    this.integrator.destroy()
+    await this.integrator.destroy()
     this.pairStyle.destroy()
     this.kineticEnergy.destroy()
     this.ctx.destroy()

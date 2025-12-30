@@ -66,6 +66,6 @@ export abstract class Integrator {
   /**
    * Clean up GPU resources
    */
-  abstract destroy(): void
+  abstract destroy(): Promise<void>
 }
 

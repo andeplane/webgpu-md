@@ -1,5 +1,6 @@
 import './style.css'
 import { Simulation, SimulationVisualizer, runBenchmark } from './core'
+import { BenchmarkModal } from './ui/BenchmarkModal'
 
 // UI elements
 let simulation: Simulation | null = null
@@ -9,6 +10,7 @@ let playBtn: HTMLButtonElement | null = null
 let stepBtn: HTMLButtonElement | null = null
 let resetBtn: HTMLButtonElement | null = null
 let benchmarkBtn: HTMLButtonElement | null = null
+let scalingBenchmarkBtn: HTMLButtonElement | null = null
 let showBoxCheckbox: HTMLInputElement | null = null
 let stepsSlider: HTMLInputElement | null = null
 let stepsValue: HTMLElement | null = null
@@ -80,6 +82,7 @@ async function initializeApp() {
               Enable profiling (slower)
             </label>
             <button id="benchmark-btn" class="benchmark-btn">Run Benchmark</button>
+            <button id="scaling-benchmark-btn" class="benchmark-btn">Scaling Benchmark</button>
             <div id="benchmark-result" class="benchmark-result"></div>
           </div>
           
@@ -130,6 +133,7 @@ async function initializeApp() {
   stepBtn = document.getElementById('step-btn') as HTMLButtonElement
   resetBtn = document.getElementById('reset-btn') as HTMLButtonElement
   benchmarkBtn = document.getElementById('benchmark-btn') as HTMLButtonElement
+  scalingBenchmarkBtn = document.getElementById('scaling-benchmark-btn') as HTMLButtonElement
   showBoxCheckbox = document.getElementById('show-box') as HTMLInputElement
   stepsSlider = document.getElementById('steps-slider') as HTMLInputElement
   stepsValue = document.getElementById('steps-value')
@@ -143,6 +147,12 @@ async function initializeApp() {
   benchmarkBtn?.addEventListener('click', runBenchmarkMode)
   showBoxCheckbox?.addEventListener('change', toggleShowBox)
   stepsSlider?.addEventListener('input', updateStepsPerFrame)
+
+  // Create scaling benchmark modal
+  const scalingBenchmarkModal = new BenchmarkModal()
+  scalingBenchmarkBtn?.addEventListener('click', () => {
+    scalingBenchmarkModal.show()
+  })
 
   // Check WebGPU support
   if (!navigator.gpu) {
@@ -162,7 +172,7 @@ async function resetSimulation() {
     visualizer.destroy()
   }
   if (simulation) {
-    simulation.destroy()
+    await simulation.destroy()
   }
   
   // Reset energy tracking
@@ -380,7 +390,7 @@ async function runBenchmarkMode() {
     updateStatus('Benchmark failed')
   } finally {
     // Clean up benchmark simulation (always runs, even on error)
-    benchSim?.destroy()
+    await benchSim?.destroy()
   }
 
   // Re-enable controls

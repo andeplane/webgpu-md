@@ -1,5 +1,6 @@
 import type { Simulation } from './Simulation'
 import type { ProfileStats } from './SimulationProfiler'
+import { VelocityVerlet } from '../integrators/VelocityVerlet'
 
 /**
  * Benchmark result
@@ -53,8 +54,17 @@ export async function runBenchmark(
 
   // Warmup phase - uses the SAME run() method
   console.log('Running warmup...')
-  simulation.run(warmupSteps)
+  await simulation.run(warmupSteps)
   await simulation.ctx.waitForGPU()
+
+  // #region agent log
+  // Check displacement state after warmup
+  if (simulation.integrator instanceof VelocityVerlet) {
+    const dispSq = await (simulation.integrator as VelocityVerlet).getMaxDisplacementSq()
+    const lastRebuild = (simulation as unknown as { lastNeighRebuild: number }).lastNeighRebuild
+    fetch('http://127.0.0.1:7246/ingest/e9877eb4-381b-4296-a542-1edca1096ba6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Benchmark.ts:after_warmup',message:'displacement_after_warmup',data:{maxDispSq:dispSq,maxDisp:Math.sqrt(dispSq),currentStep:simulation.currentStep,lastNeighRebuild:lastRebuild,stepsSinceRebuild:simulation.currentStep-lastRebuild},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+  }
+  // #endregion
 
   // Enable profiling if requested
   let profiler = null
@@ -71,7 +81,7 @@ export async function runBenchmark(
     await simulation.runWithProfiling(benchmarkSteps)
   } else {
     // Use normal fast version
-    simulation.run(benchmarkSteps)
+    await simulation.run(benchmarkSteps)
   }
 
   await simulation.ctx.waitForGPU()

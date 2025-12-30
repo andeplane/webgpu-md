@@ -40,6 +40,7 @@ export class VelocityVerlet extends Integrator {
 
   // Displacement tracking
   private trackDisplacement = true
+  private pendingGetMaxDisplacement: Promise<number> | null = null
 
   constructor(ctx: WebGPUContext, numAtoms: number, config: IntegratorConfig) {
     super(ctx, numAtoms, config)
@@ -234,29 +235,58 @@ export class VelocityVerlet extends Integrator {
   /**
    * Get the maximum displacement squared since last rebuild
    * Returns the actual squared displacement (unscaled)
+   * Uses a lock to prevent concurrent calls that would cause buffer mapping conflicts
    */
   async getMaxDisplacementSq(): Promise<number> {
-    // Wait for any pending GPU work to complete before using staging buffer
-    // This prevents "buffer used in submit while pending map" errors
-    await this.ctx.waitForGPU()
+    // Wait for any pending call to complete first
+    if (this.pendingGetMaxDisplacement) {
+      await this.pendingGetMaxDisplacement
+    }
 
-    const commandEncoder = this.ctx.createCommandEncoder()
-    commandEncoder.copyBufferToBuffer(
-      this.maxDisplacementSqBuffer,
-      0,
-      this.maxDisplacementStagingBuffer,
-      0,
-      4
-    )
-    this.ctx.submit([commandEncoder.finish()])
+    // Create a new promise for this call
+    const promise = (async () => {
+      try {
+        // Wait for any pending GPU work to complete before using staging buffer
+        // This prevents "buffer used in submit while pending map" errors
+        await this.ctx.waitForGPU()
 
-    await this.maxDisplacementStagingBuffer.mapAsync(GPUMapMode.READ)
-    const data = new Uint32Array(this.maxDisplacementStagingBuffer.getMappedRange())
-    const scaledValue = data[0]
-    this.maxDisplacementStagingBuffer.unmap()
+        // Copy GPU buffer to staging buffer
+        const commandEncoder = this.ctx.createCommandEncoder()
+        commandEncoder.copyBufferToBuffer(
+          this.maxDisplacementSqBuffer,
+          0,
+          this.maxDisplacementStagingBuffer,
+          0,
+          4
+        )
+        this.ctx.submit([commandEncoder.finish()])
+        
+        // Wait for GPU to finish the copy before mapping
+        await this.ctx.waitForGPU()
 
-    // Unscale: we multiplied by 1e6 in shader
-    return scaledValue / 1000000.0
+        // Map, read, and unmap
+        await this.maxDisplacementStagingBuffer.mapAsync(GPUMapMode.READ)
+        let scaledValue: number
+        try {
+          const data = new Uint32Array(this.maxDisplacementStagingBuffer.getMappedRange())
+          scaledValue = data[0]
+        } finally {
+          // Always unmap, even if reading fails
+          this.maxDisplacementStagingBuffer.unmap()
+        }
+
+        // Unscale: we multiplied by 1e6 in shader
+        return scaledValue / 1000000.0
+      } finally {
+        // Clear the pending promise when done
+        if (this.pendingGetMaxDisplacement === promise) {
+          this.pendingGetMaxDisplacement = null
+        }
+      }
+    })()
+
+    this.pendingGetMaxDisplacement = promise
+    return promise
   }
 
   /**
@@ -280,7 +310,27 @@ export class VelocityVerlet extends Integrator {
   /**
    * Destroy GPU resources
    */
-  destroy(): void {
+  async destroy(): Promise<void> {
+    // Wait for any pending buffer operation to complete
+    if (this.pendingGetMaxDisplacement) {
+      try {
+        await this.pendingGetMaxDisplacement
+      } catch (e) {
+        // Ignore errors - we're destroying anyway
+      }
+    }
+    
+    // Clear pending operations
+    this.pendingGetMaxDisplacement = null
+    
+    // Try to unmap staging buffer if it's mapped (to avoid destroy errors)
+    // This is safe - unmap() on an unmapped buffer is a no-op
+    try {
+      this.maxDisplacementStagingBuffer.unmap()
+    } catch (e) {
+      // Buffer might not be mapped, which is fine
+    }
+    
     this.paramsBuffer.destroy()
     this.lastRebuildPositionsBuffer.destroy()
     this.maxDisplacementSqBuffer.destroy()

@@ -139,6 +139,17 @@ async function initializeApp() {
   resetBtn?.addEventListener('click', resetSimulation)
   showBoxCheckbox?.addEventListener('change', toggleShowBox)
   stepsSlider?.addEventListener('input', updateStepsPerFrame)
+  
+  // Space key to toggle play/pause
+  document.addEventListener('keydown', (e) => {
+    // Only handle space if not typing in an input field
+    if (e.code === 'Space' && e.target instanceof HTMLElement && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault()
+      if (playBtn && !playBtn.disabled) {
+        togglePlay()
+      }
+    }
+  })
 
   // Create scaling benchmark modal
   const scalingBenchmarkModal = new BenchmarkModal()
@@ -159,12 +170,20 @@ async function initializeApp() {
 async function resetSimulation() {
   updateStatus('Creating LJ liquid system...')
   
-  // Clean up existing simulation
+  // Stop visualizer if running and reset button state
   if (visualizer) {
+    if (visualizer.running) {
+      visualizer.stop()
+    }
     visualizer.destroy()
   }
   if (simulation) {
     await simulation.destroy()
+  }
+  
+  // Reset button to show Play
+  if (playBtn) {
+    playBtn.textContent = '▶ Play'
   }
   
   // Reset energy tracking

@@ -5,6 +5,10 @@ A high-performance molecular dynamics simulation engine running entirely in the 
 **Made by Anders Hafreager, University of Oslo**  
 *Vibe coded*
 
+## Try it out
+
+**[Live Demo](https://andeplane.github.io/webgpu-md)** - Run molecular dynamics simulations directly in your browser!
+
 ## Features
 
 - **Full WebGPU Compute Pipeline**: Forces, neighbor lists, integration, and kinetic energy calculations all run on the GPU

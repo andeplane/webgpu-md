@@ -64,8 +64,7 @@ export class SimulationState {
     this._types.fill(0)
     this._masses.fill(1.0)
     // Note: We need to upload masses AFTER buffer creation, done below
-    // Note: We need to upload masses AFTER buffer creation, done below
-
+    
     // Create GPU buffers
     this.positionsBuffer = this.createBuffer(
       this._positions.byteLength,

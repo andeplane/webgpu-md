@@ -305,10 +305,11 @@ async function runBenchmarkMode() {
   if (resultEl) resultEl.innerHTML = 'Creating simulation...'
   updateStatus('Running benchmark (no visualization)...')
 
+  let benchSim: Simulation | undefined
   try {
     // Create a fresh simulation for benchmark
-    // 50x50x50 FCC unit cells = 4*125000 = 500,000 atoms
-    const benchSim = await Simulation.createLJLiquid(50, 50, 50, {
+    // 40x40x40 FCC unit cells = 4*64000 = 256,000 atoms
+    benchSim = await Simulation.createLJLiquid(40, 40, 40, {
       density: 0.8,
       temperature: 1.0,
       epsilon: 1.0,
@@ -374,12 +375,12 @@ async function runBenchmarkMode() {
 
     updateStatus('Benchmark complete!')
 
-    // Clean up benchmark simulation
-    benchSim.destroy()
-
   } catch (error) {
     if (resultEl) resultEl.innerHTML = `Error: ${error}`
     updateStatus('Benchmark failed')
+  } finally {
+    // Clean up benchmark simulation (always runs, even on error)
+    benchSim?.destroy()
   }
 
   // Re-enable controls

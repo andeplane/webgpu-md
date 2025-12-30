@@ -56,6 +56,9 @@ export class Simulation {
   private currentStep = 0
   private neighRebuildEvery: number
   private lastNeighRebuild = 0
+  private skin: number
+  private useDisplacementRebuild = true
+  private displacementCheckEvery = 10  // Check displacement every N steps
 
   /** Optional profiler for performance measurement */
   profiler: SimulationProfiler | null = null
@@ -67,7 +70,8 @@ export class Simulation {
     integrator: Integrator,
     pairStyle: PairStyle,
     kineticEnergy: KineticEnergy,
-    neighEvery: number
+    neighEvery: number,
+    skin: number
   ) {
     this.ctx = ctx
     this.state = state
@@ -76,6 +80,7 @@ export class Simulation {
     this.pairStyle = pairStyle
     this.kineticEnergy = kineticEnergy
     this.neighRebuildEvery = neighEvery
+    this.skin = skin
   }
 
   /**
@@ -88,7 +93,7 @@ export class Simulation {
     const dt = config.dt ?? 0.005
     const cutoff = config.cutoff ?? 2.5
     const skin = config.skin ?? 0.3
-    const maxNeighbors = config.maxNeighbors ?? 64  // Reduced from 128 to improve stability
+    const maxNeighbors = config.maxNeighbors ?? 128
     const neighEvery = config.neighEvery ?? 10
 
     // Create state
@@ -127,7 +132,7 @@ export class Simulation {
     // Create kinetic energy calculator
     const kineticEnergyCalc = new KineticEnergy(ctx, config.numAtoms)
 
-    return new Simulation(ctx, state, neighborList, integrator, pairStyle, kineticEnergyCalc, neighEvery)
+    return new Simulation(ctx, state, neighborList, integrator, pairStyle, kineticEnergyCalc, neighEvery, skin)
   }
 
   /**
@@ -257,6 +262,11 @@ export class Simulation {
     sim.neighborList.build(sim.state.positionsBuffer)
     sim.lastNeighRebuild = 0
 
+    // Initialize displacement tracking (save positions at last rebuild)
+    if (sim.integrator instanceof VelocityVerlet) {
+      sim.integrator.savePositionsForRebuild(sim.state)
+    }
+
     // Compute initial forces f(t=0) - needed for velocity Verlet first half-step
     sim.pairStyle.compute(sim.state, sim.neighborList)
 
@@ -310,6 +320,7 @@ export class Simulation {
 
   /**
    * Run a single timestep using velocity Verlet integration
+   * Uses fixed-interval neighbor list rebuild (for synchronous execution)
    */
   step(): void {
     // Velocity Verlet integration:
@@ -318,9 +329,9 @@ export class Simulation {
     this.integrator.integrateInitial(this.state)
 
     // 3. Rebuild neighbor list if needed (after position update)
+    // Using fixed interval for synchronous step()
     if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
-      this.neighborList.build(this.state.positionsBuffer)
-      this.lastNeighRebuild = this.currentStep
+      this.rebuildNeighborList()
     }
 
     // 4. Compute forces f(t+dt)
@@ -333,8 +344,61 @@ export class Simulation {
   }
 
   /**
+   * Run a single timestep with displacement-based neighbor list rebuild (async)
+   * More efficient than step() as it only rebuilds when atoms have moved enough
+   */
+  async stepAsync(): Promise<void> {
+    // Velocity Verlet integration:
+    // 1. v(t+dt/2) = v(t) + 0.5 * dt * f(t) / m
+    // 2. x(t+dt) = x(t) + dt * v(t+dt/2)
+    this.integrator.integrateInitial(this.state)
+
+    // 3. Check displacement and rebuild neighbor list if needed
+    if (this.useDisplacementRebuild && this.integrator instanceof VelocityVerlet) {
+      // Check every N steps to amortize GPU readback cost
+      if ((this.currentStep - this.lastNeighRebuild) % this.displacementCheckEvery === 0) {
+        const needsRebuild = await this.integrator.needsNeighborRebuild(this.skin)
+        if (needsRebuild) {
+          this.rebuildNeighborList()
+        }
+      }
+      // Fallback: always rebuild at max interval
+      else if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery * 5) {
+        this.rebuildNeighborList()
+      }
+    } else {
+      // Fall back to fixed interval
+      if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
+        this.rebuildNeighborList()
+      }
+    }
+
+    // 4. Compute forces f(t+dt)
+    this.pairStyle.compute(this.state, this.neighborList)
+
+    // 5. v(t+dt) = v(t+dt/2) + 0.5 * dt * f(t+dt) / m
+    this.integrator.integrateFinal(this.state)
+
+    this.currentStep++
+  }
+
+  /**
+   * Rebuild the neighbor list and update displacement tracking
+   */
+  private rebuildNeighborList(): void {
+    this.neighborList.build(this.state.positionsBuffer)
+    this.lastNeighRebuild = this.currentStep
+    
+    // Save positions for displacement tracking
+    if (this.integrator instanceof VelocityVerlet) {
+      this.integrator.savePositionsForRebuild(this.state)
+    }
+  }
+
+  /**
    * Run a single timestep with profiling (async for GPU synchronization)
    * This is slower than step() due to GPU sync points, use only for profiling
+   * Uses displacement-based neighbor list rebuild
    */
   async stepWithProfiling(): Promise<void> {
     const p = this.profiler
@@ -345,12 +409,32 @@ export class Simulation {
     this.integrator.integrateInitial(this.state)
     if (p) await p.end('integration', waitForGPU)
 
-    // 2. Rebuild neighbor list if needed
-    if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
-      p?.start('neighborListBuild')
-      this.neighborList.build(this.state.positionsBuffer)
-      if (p) await p.end('neighborListBuild', waitForGPU)
-      this.lastNeighRebuild = this.currentStep
+    // 2. Check displacement and rebuild neighbor list if needed
+    let didRebuild = false
+    if (this.useDisplacementRebuild && this.integrator instanceof VelocityVerlet) {
+      // Check every N steps to amortize GPU readback cost
+      if ((this.currentStep - this.lastNeighRebuild) % this.displacementCheckEvery === 0) {
+        const needsRebuild = await this.integrator.needsNeighborRebuild(this.skin)
+        if (needsRebuild) {
+          p?.start('neighborListBuild')
+          this.rebuildNeighborList()
+          if (p) await p.end('neighborListBuild', waitForGPU)
+          didRebuild = true
+        }
+      }
+      // Fallback: always rebuild at max interval
+      if (!didRebuild && this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery * 5) {
+        p?.start('neighborListBuild')
+        this.rebuildNeighborList()
+        if (p) await p.end('neighborListBuild', waitForGPU)
+      }
+    } else {
+      // Fall back to fixed interval
+      if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
+        p?.start('neighborListBuild')
+        this.rebuildNeighborList()
+        if (p) await p.end('neighborListBuild', waitForGPU)
+      }
     }
 
     // 3. Compute forces

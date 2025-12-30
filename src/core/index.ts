@@ -10,3 +10,6 @@ export { SimulationVisualizer, createSimulationVisualizer, Visualizer, Particles
 export { runBenchmark } from './Benchmark'
 export type { BenchmarkResult, BenchmarkConfig } from './Benchmark'
 
+export { SimulationProfiler } from './SimulationProfiler'
+export type { ProfileStats } from './SimulationProfiler'
+

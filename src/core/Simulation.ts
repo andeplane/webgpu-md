@@ -3,6 +3,7 @@ import { NeighborList } from '../compute/NeighborList'
 import { KineticEnergy } from '../compute/KineticEnergy'
 import { SimulationBox } from './SimulationBox'
 import { SimulationState } from './SimulationState'
+import { SimulationProfiler } from './SimulationProfiler'
 import type { PairStyle } from '../pair-styles/PairStyle'
 import type { Integrator } from '../integrators/Integrator'
 import { VelocityVerlet } from '../integrators/VelocityVerlet'
@@ -55,6 +56,9 @@ export class Simulation {
   private currentStep = 0
   private neighRebuildEvery: number
   private lastNeighRebuild = 0
+
+  /** Optional profiler for performance measurement */
+  profiler: SimulationProfiler | null = null
 
   private constructor(
     ctx: WebGPUContext,
@@ -276,11 +280,27 @@ export class Simulation {
   /**
    * Run simulation for specified number of steps
    */
-  run(numSteps: number, options: { logEvery?: number, computeEnergy?: boolean } = {}): void {
+  run(numSteps: number, options: { logEvery?: number } = {}): void {
     const logEvery = options.logEvery ?? 0
     
     for (let step = 0; step < numSteps; step++) {
       this.step()
+
+      if (logEvery > 0 && this.currentStep % logEvery === 0) {
+        console.log(`Step ${this.currentStep}`)
+      }
+    }
+  }
+
+  /**
+   * Run simulation for specified number of steps with profiling
+   * Use this when you need timing breakdown (slower due to GPU sync)
+   */
+  async runWithProfiling(numSteps: number, options: { logEvery?: number } = {}): Promise<void> {
+    const logEvery = options.logEvery ?? 0
+    
+    for (let step = 0; step < numSteps; step++) {
+      await this.stepWithProfiling()
 
       if (logEvery > 0 && this.currentStep % logEvery === 0) {
         console.log(`Step ${this.currentStep}`)
@@ -310,6 +330,56 @@ export class Simulation {
     this.integrator.integrateFinal(this.state)
 
     this.currentStep++
+  }
+
+  /**
+   * Run a single timestep with profiling (async for GPU synchronization)
+   * This is slower than step() due to GPU sync points, use only for profiling
+   */
+  async stepWithProfiling(): Promise<void> {
+    const p = this.profiler
+    const waitForGPU = () => this.ctx.waitForGPU()
+
+    // 1. Initial integration (half-step velocity + position update)
+    p?.start('integration')
+    this.integrator.integrateInitial(this.state)
+    if (p) await p.end('integration', waitForGPU)
+
+    // 2. Rebuild neighbor list if needed
+    if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
+      p?.start('neighborListBuild')
+      this.neighborList.build(this.state.positionsBuffer)
+      if (p) await p.end('neighborListBuild', waitForGPU)
+      this.lastNeighRebuild = this.currentStep
+    }
+
+    // 3. Compute forces
+    p?.start('forceCalculation')
+    this.pairStyle.compute(this.state, this.neighborList)
+    if (p) await p.end('forceCalculation', waitForGPU)
+
+    // 4. Final integration (half-step velocity)
+    p?.start('integration')
+    this.integrator.integrateFinal(this.state)
+    if (p) await p.end('integration', waitForGPU)
+
+    this.currentStep++
+    p?.endStep()
+  }
+
+  /**
+   * Enable profiling for this simulation
+   */
+  enableProfiling(): SimulationProfiler {
+    this.profiler = new SimulationProfiler()
+    return this.profiler
+  }
+
+  /**
+   * Disable profiling
+   */
+  disableProfiling(): void {
+    this.profiler = null
   }
 
   /**

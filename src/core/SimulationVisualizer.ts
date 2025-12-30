@@ -156,8 +156,12 @@ export class SimulationVisualizer {
   async update(): Promise<void> {
     if (!this.particles) return
 
-    // Read positions from GPU
+    const profiler = this.simulation.profiler
+
+    // Read positions from GPU (this is the data copy)
+    profiler?.start('dataCopy')
     const positions = await this.simulation.readPositions()
+    profiler?.endSync('dataCopy')
 
     // Update omovi particles
     this.particles.positions.set(positions)
@@ -196,9 +200,15 @@ export class SimulationVisualizer {
   private loop = async (): Promise<void> => {
     if (!this.isRunning) return
 
-    // Run simulation steps
-    for (let i = 0; i < this.stepsPerFrame; i++) {
-      this.simulation.step()
+    // Run simulation steps (use profiling version if profiler is enabled)
+    if (this.simulation.profiler) {
+      for (let i = 0; i < this.stepsPerFrame; i++) {
+        await this.simulation.stepWithProfiling()
+      }
+    } else {
+      for (let i = 0; i < this.stepsPerFrame; i++) {
+        this.simulation.step()
+      }
     }
 
     // Update visualization

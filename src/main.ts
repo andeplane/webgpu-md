@@ -75,6 +75,10 @@ async function initializeApp() {
           
           <div class="panel">
             <h2>Benchmark</h2>
+            <label class="checkbox-label">
+              <input type="checkbox" id="profile-checkbox">
+              Enable profiling (slower)
+            </label>
             <button id="benchmark-btn" class="benchmark-btn">Run Benchmark</button>
             <div id="benchmark-result" class="benchmark-result"></div>
           </div>
@@ -295,6 +299,9 @@ async function runBenchmarkMode() {
   if (resetBtn) resetBtn.disabled = true
 
   const resultEl = document.getElementById('benchmark-result')
+  const profileCheckbox = document.getElementById('profile-checkbox') as HTMLInputElement
+  const enableProfiling = profileCheckbox?.checked ?? false
+  
   if (resultEl) resultEl.innerHTML = 'Creating simulation...'
   updateStatus('Running benchmark (no visualization)...')
 
@@ -315,11 +322,12 @@ async function runBenchmarkMode() {
     const result = await runBenchmark(benchSim, {
       warmupSteps: 100,
       benchmarkSteps: 1000,
+      profile: enableProfiling,
     })
 
     // Display results
     if (resultEl) {
-      resultEl.innerHTML = `
+      let html = `
         <div class="bench-stat">
           <span class="bench-label">Atoms:</span>
           <span class="bench-value">${result.numAtoms}</span>
@@ -337,6 +345,31 @@ async function runBenchmarkMode() {
           <span class="bench-value">${result.nsPerAtomStep.toFixed(2)}</span>
         </div>
       `
+      
+      // Add profiling breakdown if available
+      if (result.profiling && result.profiling.total > 0) {
+        const p = result.profiling
+        const pct = (val: number) => ((val / p.total) * 100).toFixed(1)
+        const ms = (val: number) => (val / p.stepCount).toFixed(2)
+        
+        html += `
+          <div class="bench-divider"></div>
+          <div class="bench-stat">
+            <span class="bench-label">Force calc:</span>
+            <span class="bench-value">${pct(p.forceCalculation)}% (${ms(p.forceCalculation)} ms)</span>
+          </div>
+          <div class="bench-stat">
+            <span class="bench-label">Neighbor list:</span>
+            <span class="bench-value">${pct(p.neighborListBuild)}% (${ms(p.neighborListBuild)} ms)</span>
+          </div>
+          <div class="bench-stat">
+            <span class="bench-label">Integration:</span>
+            <span class="bench-value">${pct(p.integration)}% (${ms(p.integration)} ms)</span>
+          </div>
+        `
+      }
+      
+      resultEl.innerHTML = html
     }
 
     updateStatus('Benchmark complete!')

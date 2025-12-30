@@ -313,6 +313,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-size: 1.1em;
 }
 
+.bench-divider {
+  height: 1px;
+  background: var(--accent-primary);
+  margin: 0.75rem 0;
+  opacity: 0.5;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .main-content {

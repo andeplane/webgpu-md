@@ -80,8 +80,3 @@ The application provides an interactive web interface where you can:
 ## Related Projects
 
 For more powerful molecular dynamics capabilities, check out [Atomify](https://github.com/andeplane/atomify) - real-time molecular dynamics in the browser using LAMMPS. [Try Atomify](https://andeplane.github.io/atomify/) to run full LAMMPS simulations with advanced features like custom scripts, real-time plotting, and Jupyter notebook integration.
-
-## License
-
-MIT
-

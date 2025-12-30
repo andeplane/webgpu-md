@@ -43,6 +43,11 @@ export class SimulationVisualizer {
 
     // Set material properties (same as atomify)
     this.visualizer.materials.particles.shininess = 50
+
+    // Enable SSAO post-processing for depth/shadows
+    this.visualizer.initPostProcessing({
+      ssao: { enabled: true, radius: 10.0, intensity: 5.0 }
+    })
   }
 
   /**

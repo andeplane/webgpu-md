@@ -3,7 +3,7 @@ import type { SimulationBox } from '../core/SimulationBox'
 
 // Constants for box geometry rendering
 const RADIUS_SCALE_FACTOR = 0.0015
-const MIN_RADIUS = 0.05
+const MIN_RADIUS = 0.1
 const CYLINDER_RADIAL_SEGMENTS = 8
 const ZERO_LENGTH_THRESHOLD = 1e-4
 const MIN_NORMALIZED_LENGTH = 0.001
@@ -58,8 +58,6 @@ export function createBoxGeometry(box: SimulationBox, radius?: number): THREE.Gr
   // Create material - white wireframe
   const material = new THREE.MeshBasicMaterial({
     color: 0xffffff,
-    transparent: true,
-    opacity: 0.6,
   })
 
   // Create a cylinder for each edge

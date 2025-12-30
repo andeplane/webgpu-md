@@ -236,6 +236,10 @@ export class VelocityVerlet extends Integrator {
    * Returns the actual squared displacement (unscaled)
    */
   async getMaxDisplacementSq(): Promise<number> {
+    // Wait for any pending GPU work to complete before using staging buffer
+    // This prevents "buffer used in submit while pending map" errors
+    await this.ctx.waitForGPU()
+
     const commandEncoder = this.ctx.createCommandEncoder()
     commandEncoder.copyBufferToBuffer(
       this.maxDisplacementSqBuffer,

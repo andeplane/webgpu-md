@@ -207,7 +207,7 @@ export class SimulationVisualizer {
       }
     } else {
       for (let i = 0; i < this.stepsPerFrame; i++) {
-        this.simulation.step()
+        await this.simulation.step()
       }
     }
 
@@ -230,7 +230,7 @@ export class SimulationVisualizer {
    * Run a single step and update visualization
    */
   async stepAndRender(): Promise<void> {
-    this.simulation.step()
+    await this.simulation.step()
     await this.update()
     this.visualizer.forceRender = true
   }

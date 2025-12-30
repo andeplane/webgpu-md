@@ -290,11 +290,11 @@ export class Simulation {
   /**
    * Run simulation for specified number of steps
    */
-  run(numSteps: number, options: { logEvery?: number } = {}): void {
+  async run(numSteps: number, options: { logEvery?: number } = {}): Promise<void> {
     const logEvery = options.logEvery ?? 0
     
-    for (let step = 0; step < numSteps; step++) {
-      this.step()
+    for (let s = 0; s < numSteps; s++) {
+      await this.step()
 
       if (logEvery > 0 && this.currentStep % logEvery === 0) {
         console.log(`Step ${this.currentStep}`)
@@ -320,34 +320,9 @@ export class Simulation {
 
   /**
    * Run a single timestep using velocity Verlet integration
-   * Uses fixed-interval neighbor list rebuild (for synchronous execution)
+   * Uses displacement-based neighbor list rebuild (only rebuilds when atoms move enough)
    */
-  step(): void {
-    // Velocity Verlet integration:
-    // 1. v(t+dt/2) = v(t) + 0.5 * dt * f(t) / m
-    // 2. x(t+dt) = x(t) + dt * v(t+dt/2)
-    this.integrator.integrateInitial(this.state)
-
-    // 3. Rebuild neighbor list if needed (after position update)
-    // Using fixed interval for synchronous step()
-    if (this.currentStep - this.lastNeighRebuild >= this.neighRebuildEvery) {
-      this.rebuildNeighborList()
-    }
-
-    // 4. Compute forces f(t+dt)
-    this.pairStyle.compute(this.state, this.neighborList)
-
-    // 5. v(t+dt) = v(t+dt/2) + 0.5 * dt * f(t+dt) / m
-    this.integrator.integrateFinal(this.state)
-
-    this.currentStep++
-  }
-
-  /**
-   * Run a single timestep with displacement-based neighbor list rebuild (async)
-   * More efficient than step() as it only rebuilds when atoms have moved enough
-   */
-  async stepAsync(): Promise<void> {
+  async step(): Promise<void> {
     // Velocity Verlet integration:
     // 1. v(t+dt/2) = v(t) + 0.5 * dt * f(t) / m
     // 2. x(t+dt) = x(t) + dt * v(t+dt/2)
